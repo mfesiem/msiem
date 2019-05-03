@@ -4,6 +4,7 @@
 """
 
 import unittest
+import msiem
 import msiem.query
 from msiem.session import ESMSession
 from msiem.utils import log, getTimes
@@ -17,15 +18,15 @@ class Tests(unittest.TestCase):
 
     def test_QueryBase(self):
         #1
-        query = msiem.query.QueryBase(time_range='LAST_MINUTE')
+        query = msiem.query.TestingQuery(time_range='LAST_MINUTE')
         self.assertEqual('LAST_MINUTE', query.time_range, 'time range is not set uppon init')
 
         #2
-        query = msiem.query.QueryBase(time_range='CURRENT_YEAR')
+        query = msiem.query.TestingQuery(time_range='CURRENT_YEAR')
         self.assertEqual('CURRENT_YEAR', query.time_range, 'time range is not set uppon setter call')
 
         #3
-        query = msiem.query.QueryBase(time_range='CUSTOM',
+        query = msiem.query.TestingQuery(time_range='CUSTOM',
             start_time='2019-01-01T12:00',
             end_time='2019-01-15T12:00')
 
@@ -34,23 +35,23 @@ class Tests(unittest.TestCase):
         self.assertEqual('2019-01-15T12:00', query.end_time, 'end time is not set uppon setter call')
 
         #4
-        query = msiem.query.QueryBase(time_range='LAST_MINUTE')
+        query = msiem.query.TestingQuery(time_range='LAST_MINUTE')
         with self.assertRaisesRegex(msiem.exceptions.ESMException,"The time range must be in"):
             query.time_range='impossible time range'
         
         #5
-        query = msiem.query.QueryBase(time_range='LAST_MINUTE')
+        query = msiem.query.TestingQuery(time_range='LAST_MINUTE')
         with self.assertRaisesRegex(msiem.exceptions.ESMException,"The time range must be 'CUSTOM' if you want to specify a custom start time"):
             query.start_time='1999-01-01'
 
         #6
-        query = msiem.query.QueryBase(time_range='LAST_MINUTE')
+        query = msiem.query.TestingQuery(time_range='LAST_MINUTE')
         with self.assertRaisesRegex(msiem.exceptions.ESMException,"The time range must be 'CUSTOM' if you want to specify a custom end time"):
             query.end_time='1999-01-01'
 
         #7
         with self.assertRaisesRegex(msiem.exceptions.ESMException,"Base query can't be executed."):
-            msiem.query.QueryBase(
+            msiem.query.TestingQuery(
                 time_range='CUSTOM',
                 start_time='2019-01-01T14:32',
                 end_time='2019-02-01T12:00'
@@ -263,7 +264,7 @@ class Tests(unittest.TestCase):
         log.debug(events[0])
         log.debug(events2[0])
 
-        self.assertNotEqual(events, events2)
+        self.assertEqual(events, events2, 'This test will fail if the offset parameter gets fixed on the SIEM side')
 
 
     def test_TimeRange(self):

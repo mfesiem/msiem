@@ -12,6 +12,8 @@ from .constants import POSSIBLE_TIME_RANGE
 from .exceptions import ESMException
 from datetime import datetime, timedelta
 
+logging.getLogger("urllib3").setLevel(logging.WARNING)
+
 def getLog(v=True, logfile=None):
 
     log = logging.getLogger()

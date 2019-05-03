@@ -4,7 +4,8 @@
 """
 import json
 import time
-from .session import ESMSession
+from abc import abstractmethod, abstractproperty
+from .session import ESMObject
 from .exceptions import ESMException
 from .utils import log, getTimes
 from .constants import (POSSIBLE_TIME_RANGE,
@@ -13,9 +14,11 @@ from .constants import (POSSIBLE_TIME_RANGE,
     POSSIBLE_VALUE_TYPES,
     POSSIBLE_ALARM_STATUS,
     POSSBILE_ROW_ORDER,
-    DEFAULTS_EVENT_FIELDS)
+    DEFAULTS_EVENT_FIELDS,
+    ALARM_FILTER_FIELDS,
+    ALARM_EVENT_FILTER_FIELDS)
 
-class QueryBase(ESMSession):
+class QueryBase(ESMObject):
     def __init__(self, time_range=None, start_time=None, end_time=None):
         super().__init__()
 
@@ -47,6 +50,7 @@ class QueryBase(ESMSession):
     @property
     def end_time(self):
         return self._end_time
+    
 
     @time_range.setter
     def time_range(self, time_range):
@@ -54,51 +58,80 @@ class QueryBase(ESMSession):
         Set the time range of the query to the specified string value. Default : LAST_3_DAYS
         """
 
-        try:
-            if time_range in POSSIBLE_TIME_RANGE :
-                self._time_range=time_range
-                
-            else:
-                raise ESMException("The time range must be in "+str(POSSIBLE_TIME_RANGE))
+        if time_range in POSSIBLE_TIME_RANGE :
+            self._time_range=time_range
+            
+        else:
+            raise ESMException("The time range must be in "+str(POSSIBLE_TIME_RANGE))
 
-        except:raise
     
     @start_time.setter
     def start_time(self, start_time):
         """
         Set the time start of the query. Time range must be CUSTOM for this to work.
         """
-        try:
-            if start_time is not None :
-                if self._time_range == 'CUSTOM':
-                    self._start_time=start_time
-                    
-                else:
-                    raise ESMException("The time range must be 'CUSTOM' if you want to specify a custom start time")
-            else:
-                self._start_time=None
+        
+        if start_time is not None :
+            if self._time_range == 'CUSTOM':
+                self._start_time=start_time
                 
-        except:raise
+            else:
+                raise ESMException("The time range must be 'CUSTOM' if you want to specify a custom start time")
+        else:
+            self._start_time=None
+                
     
     @end_time.setter
     def end_time(self, end_time):
         """
         Set the time end of the query. Time range must be CUSTOM for this to work.
         """
-        try:
-            if end_time is not None :
-                if self._time_range == 'CUSTOM':
-                    self._end_time=end_time
-                   
-                else:
-                    raise ESMException("The time range must be 'CUSTOM' if you want to specify a custom end time")
-            else :
-                self._end_time=None
+       
+        if end_time is not None :
+            if self._time_range == 'CUSTOM':
+                self._end_time=end_time
                 
-        except:raise
+            else:
+                raise ESMException("The time range must be 'CUSTOM' if you want to specify a custom end time")
+        else :
+            self._end_time=None
+                
+    @abstractproperty
+    def filters(self):
+        raise ESMException("Not implemented in the base query")
 
+    @filters.setter
+    def filters(self, filters):
+        
+        if isinstance(filters, list):
+            for f in filters :
+                self.add_filter(f)
+
+        elif isinstance(filters, tuple):
+            self.add_filter(f)
+        
+        else :
+            raise ESMException("Illegal type for the filter object, it must be a list of a tuple.")
+       
+    @abstractmethod
+    def add_filter(self, filter):
+        raise ESMException("Not implemented in the base query")
+
+    @abstractmethod
     def execute(self):
-        raise ESMException("Base query can't be executed.")
+        raise ESMException("Not implemented in the base query")
+
+class TestingQuery(QueryBase):
+
+    @property
+    def filters(self):
+        raise ESMException("Not implemented in the test query")
+    
+    def add_filter(self, filter):
+        raise ESMException("Not implemented in the test query")
+    
+    def execute(self):
+        raise ESMException("Not implemented in the test query")
 
 class AlarmQuery(QueryBase):
 
@@ -106,7 +139,7 @@ class AlarmQuery(QueryBase):
 
         """
         filters : [(field, [values]), (field, [values])]
-        field can be an EsmTriggeredAlarm field, EsmTriggeredAlarmDetail or an EsmTriggeredAlarmEvent field
+        field can be an EsmTriggeredAlarm or an EsmTriggeredAlarmEvent field
         """
 
         super().__init__(**args)
@@ -116,7 +149,8 @@ class AlarmQuery(QueryBase):
         self._page_size=int()
         self._page_number=int()
 
-        self._filters = list(tuple())
+        self._alarm_filters = list(tuple())
+        self._event_filters = list(tuple())
 
         #Setting attributes
         self.status=status
@@ -135,21 +169,23 @@ class AlarmQuery(QueryBase):
     def page_number(self):
         return self._page_number
 
+    @property
+    def filters(self):
+        return self._alarm_filters + self._event_filters
+
     @status.setter
     def status(self, status):
         """
         Set the status filter of the alarm query. 'acknowledged', 'unacknowledged', '' or null -> all (default is '')
         """
-        try:
-            if type(status) is str : 
-                if status.lower() in POSSIBLE_ALARM_STATUS :
-                    self._status=status
-                    
-                else:
-                    raise ESMException("Illegal value of status filter. The status must be in "+str(POSSIBLE_ALARM_STATUS))
 
-        except:raise
-    
+        if type(status) is str : 
+            if status.lower() in POSSIBLE_ALARM_STATUS :
+                self._status=status
+                
+            else:
+                raise ESMException("Illegal value of status filter. The status must be in "+str(POSSIBLE_ALARM_STATUS))
+
     @page_size.setter
     def page_size(self, page_size):
         """
@@ -171,6 +207,18 @@ class AlarmQuery(QueryBase):
         """
         self._page_number=page_number
         
+    
+    def add_filter(self, afilter):
+        """
+            Make sure the filters format is tuple(field, list(values))
+        """
+        if afilter in ALARM_FILTER_FIELDS :
+            self._alarm_filters.append(tuple(afilter[0], afilter[1] if isinstance(afilter[1], list) else [afilter[1]]))
+        elif afilter in ALARM_EVENT_FILTER_FIELDS :
+            self._alarm_filters.append(tuple(afilter[0], afilter[1] if isinstance(afilter[1], list) else [afilter[1]]))
+        else:
+            raise ESMException("Illegal filter field value : "+afilter[0]+". The filter field must be in :"+str(ALARM_FILTER_FIELDS + ALARM_EVENT_FILTER_FIELDS))
+
     def execute(self):
         """"
         Execute the query.
@@ -204,9 +252,48 @@ class AlarmQuery(QueryBase):
             alarm = Alarm(**alarm_data)
             alarms.append(alarm)
 
+        return self._filter(alarms)
+
+    def _filter(self, alarms):
+
+        if len(self._alarm_filters) > 0:
+            for a in alarms :
+
+                for alarm_filter in self._alarm_filters :
+
+                    match=False
+                    value = a.__dict__[alarm_filter[0]]
+
+                    for filter_value in alarm_filter[1]:
+                        if filter_value in value:
+                            match=True
+                            break
+
+                    if not match :
+                        alarms.remove(a)
+                        break
+
+        if len(self._event_filters) > 0:
+            for a in alarms :
+                a = a.detailed
+
+                for event_filter in self._event_filters :
+
+                    match=False
+                    values = [e.__dict__[event_filter[0]] for e in a.events]
+
+                    for filter_value in event_filter[1]:
+                        if any(filter_value in value for value in values):
+                            match=True
+                            break
+
+                    if not match :
+                        alarms.remove(a)
+                        break
+                
         return alarms
 
-class Alarm(ESMSession):
+class Alarm(ESMObject):
     """
     Alarm object. 
     Gives possibility to access alarm fields and related events.
@@ -321,7 +408,7 @@ class DetailedAlarm(Alarm):
     def events(self):
         return self._events
 
-class Event(ESMSession):
+class Event(ESMObject):
     """ Based on EsmTriggeredAlarmEvent """
     def __init__(self, **args):
         self.fields=dict().update(**args)
@@ -361,7 +448,7 @@ class EventQuery(QueryBase):
 
         self._compute_time_range = compute_time_range
         
-        super().__init__(**args)\
+        super().__init__(**args)
 
         #Singleton attribute mapping
         self._possible_fields = EventQuery._possible_fields
@@ -374,8 +461,8 @@ class EventQuery(QueryBase):
             self._possible_fields = self.esmRequest('get_possible_fields', type=self._type, groupType=self._groupType)
 
         #Declaring attributes
-        self._fields=set()
         self._filters=list()
+        self._fields=set()
 
         self._limit=int()
         self._offset=int()
@@ -441,8 +528,15 @@ class EventQuery(QueryBase):
 
     @filters.setter
     def filters(self, filters):
-        for values in filters :
-            self.add_filter(values)
+        """
+            Uses BaseQuery.filter base imnplementation but adds a default filter when None
+        """
+        if not filters :
+            self.filters = [FieldFilter(name='AvgSeverity', operator='GREATER_THAN' , values=[-1])]
+        else :
+            super(self.__class__, self.__class__).filters.__set__(self, filters)
+            #https://bugs.python.org/issue14965
+            
 
     def add_filter(self, fil):
         if type(fil) is tuple :
@@ -565,7 +659,7 @@ class EventQuery(QueryBase):
             events.append(event)
         return events
 
-class QueryFilter(ESMSession):
+class QueryFilter(ESMObject):
 
     _possible_filters = None
 
@@ -686,15 +780,15 @@ class FieldFilter(QueryFilter):
             raise
 
     def add_basic_value(self, value):
-        self.add_value(type='EsmBasicValue', value=value)
+        self.add_value(type='EsmBasicValue', value=str(value))
 
     @values.setter
     def values(self, values):
         for v in values :
-            if type(v) is dict :
+            if isinstance(v, dict):
                 self.add_value(**v)
 
-            elif type(v) is str :
+            elif isinstance(v, (int, float, str)) :
                 self.add_basic_value(v)
 
 

@@ -22,29 +22,40 @@ from .exceptions import ESMException
 from .utils import log, tob64
 from .config import ESMConfig
 
+
+
 class ESMSession(ABC):
 
-    # static variables
-    _headers={'Content-Type': 'application/json'}
-    _executor = ThreadPoolExecutor(max_workers=ASYNC_MAX_WORKERS)
-    _logged=False
-    _config=None
+
+    """
+        # static variables
+        _headers={'Content-Type': 'application/json'}
+        _executor = ThreadPoolExecutor(max_workers=ASYNC_MAX_WORKERS)
+
+        _config=None
+    """
+
+    #Singleton : unique instance
+    _instance = None
+
+    def __new__(cls, *args, **kwargs):
+        if ESMSession._instance is None :
+            log.debug('Creating a new instance of ESMSession')
+            ESMSession._instance = ABC.__new__(cls, *args, **kwargs)
+        return ESMSession._instance
 
     def __init__(self, conf_path=None, **config):
 
         #Config parsing
-        ESMSession._config = ESMConfig(path=conf_path, **config)
-        
-        #singleton attributes mapping
-        self._config=ESMSession._config
-        self._executor = ESMSession._executor
-        self._headers=ESMSession._headers
-        self._logged=ESMSession._logged
+        self._config = ESMConfig(path=conf_path, **config)
+        self._executor = ThreadPoolExecutor(max_workers=ASYNC_MAX_WORKERS)
+        self._headers={'Content-Type': 'application/json'}
+        self._login()
 
     def __str__(self):
         return repr(self)
 
-    def login(self):
+    def _login(self):
         userb64 = tob64(self._config.get('esm', 'user'))
         passb64 = self._config.get('esm', 'passwd')
         
@@ -54,11 +65,8 @@ class ESMSession(ABC):
             self._headers['Cookie'] = resp.headers.get('Set-Cookie')
             self._headers['X-Xsrf-Token'] = resp.headers.get('Xsrf-Token')
 
-            self._logged = True
-
             if self.esmRequest('get_user_locale') == False :
 
-                self._logged = False
                 log.error("Failed to login ")
                 raise ESMException("Login failed")
 
@@ -66,19 +74,13 @@ class ESMSession(ABC):
             log.error("Failed to login \n"+str(err))
             raise ESMException("Login failed")
 
-    @property
-    def logged(self):
-        return self._logged
-        #return (not self.esmRequest('get_user_locale') == False)
-
+    """
     def logout(self):
         self.esmRequest('logout')
-        self._logged=False
+        
+        """
 
-    def esmRequest(self, method, callback=None, raw=False, secure=False, asynch=True, **params):
-
-        if not self.logged and method is not 'login' :
-            self.login()
+    def esmRequest(self, method, callback=None, raw=False, secure=False, asynch=False, **params):
 
         method, data = PARAMS.get(method)
 
@@ -99,7 +101,7 @@ class ESMSession(ABC):
             log.error(str(err))
             return False
 
-    def _post(self, method=None, data=None, callback=None, raw=False, secure=False, asynch=True):
+    def _post(self, method=None, data=None, callback=None, raw=False, secure=False, asynch=False):
         """
         Helper method
         If method is all upper cases, a private API is done.
@@ -123,8 +125,10 @@ class ESMSession(ABC):
             if data:
                 data = json.dumps(data)
 
-        if data and not secure :
-            log.debug('DATA : '+data)
+        log.debug('POSTING : '+method)
+        if not secure :
+            if data :
+                log.debug('DATA    : '+data)
 
         try :
             if asynch :
@@ -132,7 +136,7 @@ class ESMSession(ABC):
                     requests.post, 
                     urljoin(url.format(self._config.get('esm', 'host')), method),
                     data=data, 
-                    headers=ESMSession._headers,
+                    headers=self._headers,
                     verify=self._config.getboolean('general','ssl_verify'),
                     timeout=GENERAL_POST_TIMEOUT
                     )
@@ -143,7 +147,7 @@ class ESMSession(ABC):
                 result = requests.post(
                     urljoin(url.format(self._config.get('esm', 'host')), method),
                     data=data, 
-                    headers=ESMSession._headers,
+                    headers=self._headers,
                     verify=self._config.getboolean('general','ssl_verify'),
                     timeout=GENERAL_POST_TIMEOUT
                 )
@@ -225,3 +229,13 @@ class ESMSession(ABC):
                 value = unquote(pair[-1])
             formatted[key] = value
         return formatted
+
+class ESMObject(ABC):
+
+    def __init__(self):
+        self._session = ESMSession()
+
+    def esmRequest(self, *args, **kwargs):
+        return self._session.esmRequest(*args, **kwargs)
+    
+
