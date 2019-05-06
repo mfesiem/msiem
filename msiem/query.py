@@ -4,10 +4,12 @@
 """
 import json
 import time
+import concurrent.futures
+from tqdm import tqdm
 from abc import abstractmethod, abstractproperty
 from .session import ESMObject
 from .exceptions import ESMException
-from .utils import log, getTimes
+from .utils import log, getTimes, regexMatch
 from .constants import (POSSIBLE_TIME_RANGE,
     POSSIBLE_FIELD_TYPES, 
     POSSIBLE_OPERATORS, 
@@ -108,7 +110,10 @@ class QueryBase(ESMObject):
                 self.add_filter(f)
 
         elif isinstance(filters, tuple):
-            self.add_filter(f)
+            self.add_filter(filters)
+
+        elif filters is None :
+            pass
         
         else :
             raise ESMException("Illegal type for the filter object, it must be a list of a tuple.")
@@ -156,6 +161,9 @@ class AlarmQuery(QueryBase):
         self.status=status
         self.page_size=page_size
         self.page_number=page_number
+
+        #uses the parent setter
+        super(self.__class__, self.__class__).filters.__set__(self, filters)
 
     @property
     def status(self):
@@ -207,15 +215,20 @@ class AlarmQuery(QueryBase):
         """
         self._page_number=page_number
         
-    
     def add_filter(self, afilter):
         """
-            Make sure the filters format is tuple(field, list(values))
+            Make sure the filters format is tuple(field, list(values in string))
         """
-        if afilter in ALARM_FILTER_FIELDS :
-            self._alarm_filters.append(tuple(afilter[0], afilter[1] if isinstance(afilter[1], list) else [afilter[1]]))
-        elif afilter in ALARM_EVENT_FILTER_FIELDS :
-            self._alarm_filters.append(tuple(afilter[0], afilter[1] if isinstance(afilter[1], list) else [afilter[1]]))
+        
+        values = afilter[1] if isinstance(afilter[1], list) else [afilter[1]]
+        values = [str(v) for v in values]
+
+        if afilter[0] in ALARM_FILTER_FIELDS :
+            self._alarm_filters.append((afilter[0], values))
+        
+        elif afilter[0] in ALARM_EVENT_FILTER_FIELDS :
+            self._event_filters.append((afilter[0], values))
+        
         else:
             raise ESMException("Illegal filter field value : "+afilter[0]+". The filter field must be in :"+str(ALARM_FILTER_FIELDS + ALARM_EVENT_FILTER_FIELDS))
 
@@ -251,46 +264,56 @@ class AlarmQuery(QueryBase):
         for alarm_data in resp :
             alarm = Alarm(**alarm_data)
             alarms.append(alarm)
+        
+        if len(alarms) == 5000:
+            log.warning("The maximum amount of alarms was retreived from the SIEM, refine your time range to avoid sskipping alarms.")
 
         return self._filter(alarms)
 
+    def _alarm_match(self, alarm):
+        match=True
+        for alarm_filter in self._alarm_filters :
+            match=False
+            value = str(alarm.__dict__[alarm_filter[0]]) #Can only match strings
+            for filter_value in alarm_filter[1]:
+                if regexMatch(filter_value.lower(), value.lower()):
+                    match=True
+                    break
+            if not match :
+                break
+        return match
+        
+    def _event_match(self, alarm):
+        match=True
+        for event_filter in self._event_filters :
+            match=False
+            values = [str(event[event_filter[0]]) for event in alarm.events] #Can only match strings
+            for filter_value in event_filter[1]:
+                if any(regexMatch(filter_value.lower(), value.lower()) for value in values):
+                    match=True
+                    break
+            if not match :
+                break
+        return match
+        
+    @staticmethod
+    def _detailled_alarm(alarm):
+        return alarm.detailed
+
     def _filter(self, alarms):
-
-        if len(self._alarm_filters) > 0:
-            for a in alarms :
-
-                for alarm_filter in self._alarm_filters :
-
-                    match=False
-                    value = a.__dict__[alarm_filter[0]]
-
-                    for filter_value in alarm_filter[1]:
-                        if filter_value in value:
-                            match=True
-                            break
-
-                    if not match :
-                        alarms.remove(a)
-                        break
-
+        
+        alarms = [a for a in alarms if self._alarm_match(a)]
+        
         if len(self._event_filters) > 0:
-            for a in alarms :
-                a = a.detailed
+            detailed=None
+            
+            with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
+                log.info("Getting alarms infos... Please be patient.")
+                detailed = list(tqdm(executor.map(self._detailled_alarm, alarms), total=len(alarms)))
 
-                for event_filter in self._event_filters :
+            alarms = [a for a in detailed if self._event_match(a)]
 
-                    match=False
-                    values = [e.__dict__[event_filter[0]] for e in a.events]
-
-                    for filter_value in event_filter[1]:
-                        if any(filter_value in value for value in values):
-                            match=True
-                            break
-
-                    if not match :
-                        alarms.remove(a)
-                        break
-                
+        log.info(str(len(alarms)) + " alarms matching your filter")
         return alarms
 
 class Alarm(ESMObject):
@@ -336,16 +359,20 @@ class Alarm(ESMObject):
     def events(self):
         return self.detailed.events
 
+    @property
+    def status(self):
+        return('unacknowledged' if (self.acknowledgedDate == '' and self.acknowledgedUsername =='') else 'acknowledged')
+
     def delele(self):
-        self.esmRequest('delete_alarms', ids=[self.id])
+        self.esmRequest('delete_alarms', ids=[self.id['value']])
         return
     
     def acknowledge(self):
-        self.esmRequest('ack_alarms', ids=[self.id])
+        self.esmRequest('ack_alarms', ids=[self.id['value']])
         return
 
     def unacknowledge(self):
-        self.esmRequest('unack_alarms', ids=[self.id])
+        self.esmRequest('unack_alarms', ids=[self.id['value']])
         return  
 
 class DetailedAlarm(Alarm):
@@ -354,6 +381,10 @@ class DetailedAlarm(Alarm):
     """
     def __init__(self, alarm):
         
+        
+
+        super().__init__(id=alarm.id)
+
         """
         self.id = {"value" : 0} #duplicate
         self.summary = '' #duplicate
@@ -364,11 +395,7 @@ class DetailedAlarm(Alarm):
         self.acknowledgedUsername  = ''#duplicate
         self.alarmName  = ''#duplicate
         self.conditionType  = 0 #duplicate
-        """
 
-        super().__init__(id=alarm.id)
-        
-        """
         self.filters  = ''
         self.queryId = 0
         self.alretRateMin = 0
@@ -395,8 +422,8 @@ class DetailedAlarm(Alarm):
         self._events = list()
 
         resp = self.esmRequest('get_alarm_details', id=alarm.id)
-        
-        #self.__dict__.update(resp)
+
+        self.__dict__.update(resp)
 
         self._events = resp['events']
 
@@ -419,7 +446,7 @@ class EventQuery(QueryBase):
     """
 
     #Declaring static value
-    _possible_fields = None
+    _possible_fields = []
 
     def __init__(self, fields=None, filters=None, 
         limit=5000, offset=0, order=None, compute_time_range=True, **args):
@@ -450,14 +477,13 @@ class EventQuery(QueryBase):
         
         super().__init__(**args)
 
-        #Singleton attribute mapping
-        self._possible_fields = EventQuery._possible_fields
-
-        #Constant
+        #Constants
         self._type='EVENT'
         self._groupType='NO_GROUP'
 
         """ Not checking dynamically the velidity of the fields cause makes too much of unecessary requests
+        #Singleton attribute mapping
+        self._possible_fields = EventQuery._possible_fields
         if self._possible_fields is None :
             self._possible_fields = self.esmRequest('get_possible_fields', type=self._type, groupType=self._groupType)
             """
@@ -531,10 +557,10 @@ class EventQuery(QueryBase):
     @filters.setter
     def filters(self, filters):
         """
-            Uses BaseQuery.filter base imnplementation but adds a default filter when None
+            Uses BaseQuery.filter base implementation but adds a default filter when None
         """
         if not filters :
-            self.filters = [FieldFilter(name='AvgSeverity', operator='GREATER_THAN' , values=[-1])]
+            self.filters = [FieldFilter(name='AvgSeverity', operator='GREATER_THAN' , values=[1])]
         else :
             super(self.__class__, self.__class__).filters.__set__(self, filters)
             #https://bugs.python.org/issue14965
@@ -663,7 +689,7 @@ class EventQuery(QueryBase):
 
 class QueryFilter(ESMObject):
 
-    _possible_filters = None
+    _possible_filters = []
 
     def __init__(self):
         super().__init__()

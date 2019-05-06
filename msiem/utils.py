@@ -6,6 +6,7 @@
 
 import time
 import base64
+import re
 from functools import wraps
 import logging
 from .constants import POSSIBLE_TIME_RANGE
@@ -171,3 +172,10 @@ def getTimes(timeFrame):
         pass
     elif t is 'PREVIOUS_YEAR':
         pass"""
+
+def regexMatch(regex, string):
+    log.debug
+    if re.search(regex, string):
+        return True
+    else:
+        return False

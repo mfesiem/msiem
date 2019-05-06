@@ -1,3 +1,5 @@
+#! /usr/bin/env python3
+
 from setuptools import setup
 import pathlib
 
@@ -17,7 +19,7 @@ setup(
         'console_scripts': ['msiem=msiem.command:main'],
     },
     install_requires=[
-          'requests',
+          'requests','tqdm'
     ],
     classifiers=[
         "Programming Language :: Python :: 3",

@@ -134,29 +134,6 @@ ALARM_FILTER_FIELDS = ['id',
 'acknowledgedUsername',
 'alarmName']
 
-"""
-DETAILLED_ALARM_FIELDS =["filters",
-"queryId",
-"alretRateMin",
-"alertRateCount",
-"percentAbove",
-"percentBelow",
-"offsetMinutes",
-"timeFilter",
-"maximumConditionTriggerFrequency",
-"useWatchlist",
-"matchField",
-"matchValue",
-"healthMonStatus",
-"assigneeId",
-"escalatedDate",
-"caseId",
-"caseName",
-"iocName",
-"iocId",
-"description",
-"actions",
-"events"]"""
 
 ALARM_EVENT_FILTER_FIELDS=["eventId",
 #"severity", ignored cause duplicated in ALARM_FILTER_FIELD

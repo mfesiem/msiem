@@ -4,6 +4,7 @@
 """
 
 import unittest
+import time
 import msiem
 import msiem.query
 from msiem.session import ESMSession
@@ -101,7 +102,21 @@ class Tests(unittest.TestCase):
         with self.assertRaises(Exception):
             msiem.query.Alarm(id={'value':-1}).detailed
 
-    def test_Filter(self):
+        for alarm in msiem.query.AlarmQuery(time_range='LAST_3_DAYS', status='unacknowledged').execute():
+            self.assertEqual(alarm.acknowledgedDate,  '')
+            self.assertEqual(alarm.acknowledgedUsername, '')
+        
+        for alarm in msiem.query.AlarmQuery(time_range='PREVIOUS_WEEK', page_size=2, status='acknowledged').execute():
+            alarm.unacknowledge()
+            time.sleep(20)
+            alarm=msiem.query.DetailedAlarm(alarm)
+            self.assertEqual(alarm.status, 'unacknowledged')
+            alarm.acknowledge()
+            time.sleep(20)
+            alarm=msiem.query.DetailedAlarm(alarm)
+            self.assertEqual(alarm.status, 'acknowledged')
+
+    def test_EventFilter(self):
         f = msiem.query.FieldFilter(
             name="SrcIP", 
             operator='IN',
@@ -125,6 +140,7 @@ class Tests(unittest.TestCase):
         )
 
         f = msiem.query.GroupFilter(
+                
                 msiem.query.FieldFilter(
                     name="SrcIP", 
                     operator='IN',
@@ -138,6 +154,7 @@ class Tests(unittest.TestCase):
                         {'type':'EsmBasicValue', 'value':'222.0.25.1'},
                     ]),
                 msiem.query.GroupFilter(
+                    
                     msiem.query.FieldFilter(
                         name="SigID", 
                         operator='CONTAINS',
@@ -152,7 +169,7 @@ class Tests(unittest.TestCase):
                     ]),
                     logic='AND',
                 ),
-                logic='OR'
+                logic='OR',
             )
 
         self.assertEqual(f.configDict(), {
@@ -262,7 +279,6 @@ class Tests(unittest.TestCase):
 
         self.assertEqual(events, events2, 'This test will fail if the offset parameter gets fixed on the SIEM side')
 
-
     def test_TimeRange(self):
 
         timerange = getTimes('LAST_30_MINUTES')
@@ -307,6 +323,50 @@ class Tests(unittest.TestCase):
 
         pass
 
+    def test_AlarmFilter(self):
+        
+        with self.assertRaisesRegex(msiem.exceptions.ESMException, 'Illegal filter'):
+            filtered = msiem.query.AlarmQuery(
+                time_range='LAST_3_DAYS',
+                filters=('whatever', None)
+            )
+
+        for alarm in (msiem.query.AlarmQuery(
+            time_range='LAST_3_DAYS',
+            filters=('alarmName', 'High Severity Event')
+            ).execute()) :
+            self.assertRegex(alarm.alarmName.lower(), 'High Severity Event'.lower(), 'Filtering alarms is not working')
+
+        for alarm in (msiem.query.AlarmQuery(
+            time_range='LAST_3_DAYS',
+            filters=[('alarmName', 'High Severity Event'), ('severity', [80,85,90,95,100])]
+            ).execute()) :
+            self.assertRegex(alarm.alarmName.lower(), 'High Severity Event'.lower(), 'Filtering alarms is not working')
+            self.assertRegex(str(alarm.severity), '80|85|90|95|100', 'Filtering alarms is not working')
+
+        for alarm in (msiem.query.AlarmQuery(
+            time_range='LAST_24_HOURS',
+            filters=[('alarmName', 'High Severity Event'),
+                ('severity', [80,85,90,95,100]),
+                ('ruleMessage', 'HTTP')]
+            ).execute()) :
+            self.assertRegex(alarm.alarmName.lower(), 'High Severity Event'.lower(), 'Filtering alarms is not working')
+            self.assertRegex(str(alarm.severity), '80|85|90|95|100', 'Filtering alarms is not working')
+            self.assertRegex(str(alarm.events[0]), 'HTTP', 'Filtering alarms is not working')
+        
+
+        for alarm in (msiem.query.AlarmQuery(
+            time_range='LAST_24_HOURS',
+            filters=[('alarmName', 'High Severity Event'),
+                ('severity', [80,85,90,95,100]),
+                ('ruleMessage', 'HTTP'),
+                ('destIp', '10.165')]
+            ).execute()) :
+            self.assertRegex(alarm.alarmName.lower(), 'High Severity Event'.lower(), 'Filtering alarms is not working')
+            self.assertRegex(str(alarm.severity), '80|85|90|95|100', 'Filtering alarms is not working')
+            self.assertRegex(str(alarm.events[0]), 'HTTP', 'Filtering alarms is not working')
+            self.assertRegex(str(alarm.events[0]), '10.165', 'Filtering alarms is not working')
+        
 
 if __name__ == '__main__':
     unittest.main()
