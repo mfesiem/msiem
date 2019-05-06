@@ -457,8 +457,10 @@ class EventQuery(QueryBase):
         self._type='EVENT'
         self._groupType='NO_GROUP'
 
+        """ Not checking dynamically the velidity of the fields cause makes too much of unecessary requests
         if self._possible_fields is None :
             self._possible_fields = self.esmRequest('get_possible_fields', type=self._type, groupType=self._groupType)
+            """
 
         #Declaring attributes
         self._filters=list()
@@ -557,7 +559,7 @@ class EventQuery(QueryBase):
 
     def add_field(self, field):
         try:
-            if any(f.get('name', None) == field for f in self._possible_fields):
+            if True : # Not checking dynamically the velidity of the fields cause makes too much of unecessary requests any(f.get('name', None) == field for f in self._possible_fields):
                 self._fields.add(field)
             else:
                 raise ESMException("Illegal value for the value "+field+". The field must be in "+ str([f['name'] for f in self._possible_fields]))
@@ -670,22 +672,26 @@ class QueryFilter(ESMObject):
         self.__possible_filters = QueryFilter._possible_filters
 
         #Setting up static constant
+        """ Not checking dynamically the velidity of the fields cause makes too much of unecessary requests
         if self._possible_filters is None :
             self._possible_filters = self._get_possible_filters()
+            """
 
     def _get_possible_filters(self):
         return(self.esmRequest('get_possible_filters'))
 
+    @abstractmethod
     def configDict(self):
-        return 'TODO'
+        raise ESMException("Not implemented in the base filter")
 
 class GroupFilter(QueryFilter):
     """
         Based on EsmFilterGroup
     """
-    def __init__(self, *filters, logic='AND'):
-        super().__init__()
 
+    def __init__(self, *filters, logic='AND') :
+        super().__init__()
+        
         #Declaring attributes
         self._filters=filters
         self._logic=logic
@@ -702,9 +708,8 @@ class FieldFilter(QueryFilter):
     Based on EsmFieldFilter
     """
 
-    def __init__(self, name, values, operator='IN'):
+    def __init__(self, name, values, operator='IN') :
         super().__init__()
-
         #Declaring attributes
         self._name=str()
         self._operator=str()
@@ -737,7 +742,7 @@ class FieldFilter(QueryFilter):
     @field_name.setter
     def field_name(self, name):
         try:
-            if any(f.get('name', None) == name for f in self._possible_filters):
+            if True : # Not checking dynamically the velidity of the fields cause makes too much of unecessary requests any(f.get('name', None) == name for f in self._possible_filters):
                 self._field_name = name
             else:
                 raise ESMException("Illegal value for the "+name+" field. The filter must be in :"+str([f['name'] for f in self._possible_filters]))

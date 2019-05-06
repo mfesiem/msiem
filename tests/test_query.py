@@ -12,10 +12,6 @@ import os
 
 class Tests(unittest.TestCase):
 
-    @classmethod
-    def setUpClass(cls):
-        cls.session = ESMSession()
-
     def test_QueryBase(self):
         #1
         query = msiem.query.TestingQuery(time_range='LAST_MINUTE')
@@ -50,7 +46,7 @@ class Tests(unittest.TestCase):
             query.end_time='1999-01-01'
 
         #7
-        with self.assertRaisesRegex(msiem.exceptions.ESMException,"Base query can't be executed."):
+        with self.assertRaisesRegex(msiem.exceptions.ESMException,"Not implemented"):
             msiem.query.TestingQuery(
                 time_range='CUSTOM',
                 start_time='2019-01-01T14:32',
@@ -129,34 +125,34 @@ class Tests(unittest.TestCase):
         )
 
         f = msiem.query.GroupFilter(
-            msiem.query.FieldFilter(
-                name="SrcIP", 
-                operator='IN',
-                values=[
-                    {'type':'EsmBasicValue', 'value':'10.1.1.1'},
-                ]),
-            msiem.query.FieldFilter(
-                name="DstIP", 
-                operator='IN',
-                values=[
-                    {'type':'EsmBasicValue', 'value':'222.0.25.1'},
-                ]),
-            msiem.query.GroupFilter(
                 msiem.query.FieldFilter(
-                    name="SigID", 
-                    operator='CONTAINS',
+                    name="SrcIP", 
+                    operator='IN',
                     values=[
-                        {'type':'EsmBasicValue', 'value':'123'},
-                ]),
+                        {'type':'EsmBasicValue', 'value':'10.1.1.1'},
+                    ]),
                 msiem.query.FieldFilter(
-                    name="Description", 
-                    operator='CONTAINS',
+                    name="DstIP", 
+                    operator='IN',
                     values=[
-                        {'type':'EsmBasicValue', 'value':'Critical'},
-                ]),
-                logic='AND'
-            ),
-            logic='OR'
+                        {'type':'EsmBasicValue', 'value':'222.0.25.1'},
+                    ]),
+                msiem.query.GroupFilter(
+                    msiem.query.FieldFilter(
+                        name="SigID", 
+                        operator='CONTAINS',
+                        values=[
+                            {'type':'EsmBasicValue', 'value':'123'},
+                    ]),
+                    msiem.query.FieldFilter(
+                        name="Description", 
+                        operator='CONTAINS',
+                        values=[
+                            {'type':'EsmBasicValue', 'value':'Critical'},
+                    ]),
+                    logic='AND',
+                ),
+                logic='OR'
             )
 
         self.assertEqual(f.configDict(), {

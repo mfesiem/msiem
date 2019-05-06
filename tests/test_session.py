@@ -19,7 +19,6 @@ class SessionTests(unittest.TestCase):
 
     def test_Login(self):
         s=ESMSession()
-        s.login()
-        self.assertEquals(s.logged, True)
+        self.assertEqual(s._login(), True)
 
     
