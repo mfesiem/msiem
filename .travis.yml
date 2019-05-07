@@ -9,4 +9,4 @@ python:
   - "pypy3.5"
 before_install: sudo apt-get install python3
 install: pip install msiem
-build: python3 setup.py test
+script: python3 setup.py test
