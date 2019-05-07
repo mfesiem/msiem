@@ -27,5 +27,5 @@ setup(
     license='The MIT License',
     long_description=README,
     long_description_content_type="text/markdown",
-    test_suite="tests"
+    test_suite="tests.tests"
 )

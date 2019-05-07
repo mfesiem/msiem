@@ -44,21 +44,18 @@ class ESMSession():
         return ESMSession._instance
         """
 
-    _init = False
+    _initiated = False
     _shared_state = {}
 
     def __init__(self, conf_path=None, **config):
         self.__dict__ = self._shared_state
-        if not self._init :
+        if not self._initiated :
             #Config parsing
             self._config = ESMConfig(path=conf_path, **config)
-
             self._executor = ThreadPoolExecutor(max_workers=ASYNC_MAX_WORKERS)
             self._headers={'Content-Type': 'application/json'}
-            self._login()
-
-
-            self._init = True
+            self._logged=False
+            self._initiated = True
             
     def __str__(self):
         return repr(self)
@@ -68,13 +65,15 @@ class ESMSession():
         userb64 = tob64(self._config.get('esm', 'user'))
         passb64 = self._config.get('esm', 'passwd')
         
-        resp = self.esmRequest('login', username=userb64, password=passb64, raw=True, secure=True)
+        try :
+            resp = self.esmRequest('login', username=userb64, password=passb64, raw=True, secure=True)
+            self._headers['Cookie'] = resp.headers.get('Set-Cookie')
+            self._headers['X-Xsrf-Token'] = resp.headers.get('Xsrf-Token')
         
-        self._headers['Cookie'] = resp.headers.get('Set-Cookie')
-        self._headers['X-Xsrf-Token'] = resp.headers.get('Xsrf-Token')
+        except Exception :
+            raise ESMException("Login failed")
 
         if self.esmRequest('get_user_locale') == False :
-
             log.error("Login failed")
             raise ESMException("Login failed")
 
@@ -99,6 +98,9 @@ class ESMSession():
             method = method % params
 
         post=dict()
+
+        if not self._logged and method is not 'login':
+            self._login()
 
         try :
             post = self._post(method, data, callback, raw, secure, asynch)

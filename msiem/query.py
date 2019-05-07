@@ -162,7 +162,7 @@ class AlarmQuery(QueryBase):
         self.page_size=page_size
         self.page_number=page_number
 
-        #uses the parent setter
+        #uses the parent filter setter
         super(self.__class__, self.__class__).filters.__set__(self, filters)
 
     @property
@@ -258,7 +258,6 @@ class AlarmQuery(QueryBase):
                 page_size=self.page_size,
                 page_number=self.page_number
                 )
-            
 
         alarms=list()
         for alarm_data in resp :
@@ -266,7 +265,7 @@ class AlarmQuery(QueryBase):
             alarms.append(alarm)
         
         if len(alarms) == 5000:
-            log.warning("The maximum amount of alarms was retreived from the SIEM, refine your time range to avoid sskipping alarms.")
+            log.warning("The maximum amount of alarms was retreived from the SIEM, some alarms are ignored refine your time range or status to avoid this.")
 
         return self._filter(alarms)
 
@@ -306,14 +305,19 @@ class AlarmQuery(QueryBase):
         
         if len(self._event_filters) > 0:
             detailed=None
+
+            #TODO USE THE ROOT EXECUTOR
             
             with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
                 log.info("Getting alarms infos... Please be patient.")
                 detailed = list(tqdm(executor.map(self._detailled_alarm, alarms), total=len(alarms)))
 
             alarms = [a for a in detailed if self._event_match(a)]
+        
+        else :
+            log.info("Alarms are not filtered based on event fields. Filtering is thus very fast.")
 
-        log.info(str(len(alarms)) + " alarms matching your filter")
+        log.info(str(len(alarms)) + " alarms matching your filter(s)")
         return alarms
 
 class Alarm(ESMObject):
@@ -339,21 +343,27 @@ class Alarm(ESMObject):
 
         self._detailed = None
 
-        try :
-            if self.id['value'] == 0:
-                raise ESMException("The id of the alarm haven't been initialized ! Make sure you pass a dict object with a 'value' field as the id.")
-        except KeyError :
-            raise KeyError("Make sure you pass a dict object with a 'value' field as the id.")
-        except ESMException:
-            raise
-        
         super().__init__()
+
+    def _hasID(self):
+        try :
+            if self.id['value'] == 0 :
+                return False
+            else :
+                return True
+        
+        except KeyError :
+            return False
+
 
     @property
     def detailed(self):
-        if self._detailed is None :
-            self._detailed = DetailedAlarm(self)
-        return self._detailed
+        if self._hasID() :
+            if self._detailed is None :
+                self._detailed = DetailedAlarm(self)
+            return self._detailed
+        else :
+            raise ESMException("Looks like this alarm doesn't have a valid ID. Cannot get the details.")
 
     @property
     def events(self):
@@ -364,15 +374,24 @@ class Alarm(ESMObject):
         return('unacknowledged' if (self.acknowledgedDate == '' and self.acknowledgedUsername =='') else 'acknowledged')
 
     def delele(self):
-        self.esmRequest('delete_alarms', ids=[self.id['value']])
+        if self._hasID() :
+            self.esmRequest('delete_alarms', ids=[self.id['value']])
+        else :
+            raise ESMException("Looks like this alarm doesn't have a valid ID. Cannot delete.")
         return
     
     def acknowledge(self):
-        self.esmRequest('ack_alarms', ids=[self.id['value']])
+        if self._hasID() :
+            self.esmRequest('ack_alarms', ids=[self.id['value']])
+        else :
+            raise ESMException("Looks like this alarm doesn't have a valid ID. Cannot acknowledge.")
         return
 
     def unacknowledge(self):
-        self.esmRequest('unack_alarms', ids=[self.id['value']])
+        if self._hasID() :
+            self.esmRequest('unack_alarms', ids=[self.id['value']])
+        else :
+            raise ESMException("Looks like this alarm doesn't have a valid ID. Cannot unacknowledge.")
         return  
 
 class DetailedAlarm(Alarm):
@@ -380,9 +399,10 @@ class DetailedAlarm(Alarm):
     Alarm details object. Based on EsmTriggeredAlarmDetail
     """
     def __init__(self, alarm):
-        
-        
 
+        if not alarm._hasID() :
+            raise ESMException("Looks like this alarm doesn't have a valid ID. Cannot init DetailledAlarm.")
+        
         super().__init__(id=alarm.id)
 
         """
