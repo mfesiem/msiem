@@ -1,5 +1,6 @@
 dist: xenial
 language: python
+if: branch = master
 python:
   - "3.5"
   - "3.6"
