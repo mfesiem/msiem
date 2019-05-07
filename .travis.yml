@@ -1,6 +1,5 @@
 dist: xenial
 language: python
-if: branch = stable
 python:
   - "3.5"
   - "3.6"
