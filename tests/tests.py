@@ -5,12 +5,14 @@
 
 import unittest
 import time
+import subprocess, shlex
 import msiem
 import msiem.query
 from msiem.utils import log, getTimes
 
 class Tests(unittest.TestCase):
 
+   
     def test_QueryBase(self):
         
 
@@ -191,5 +193,16 @@ class Tests(unittest.TestCase):
             }
         )
         
+     @staticmethod
+    
+    
+    def command(cmd):
+        return str(subprocess.run(shlex.split(cmd), capture_output=True).stdout)
+
+
+    def test_Command(self):
+        help_msg=self.command('msiem --help')
+        self.assertRegex(help_msg, 'McAfee SIEM Command Line Interface and Python API')
+
 if __name__ == '__main__':
     unittest.main()

@@ -13,13 +13,16 @@ setup(
     name='msiem',
     description="McAfee SIEM Command Line Interface and Python API",
     url='https://github.com/tristanlatr/msiem',
-    version='0.0.1',
+    version='0.0.2',
     packages=['msiem',],
     entry_points = {
         'console_scripts': ['msiem=msiem.command:main'],
     },
     install_requires=[
           'requests','tqdm'
+    ],
+    tests_require=[
+          'pylint','pyreverse'
     ],
     classifiers=[
         "Programming Language :: Python :: 3",

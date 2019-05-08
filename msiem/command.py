@@ -3,7 +3,7 @@
     msiem command
 """
 
-"""
+lol="""
 What it could look like :
 
 msiem 
@@ -157,7 +157,7 @@ msiem elm
 import argparse
 try:
     from .config import ESMConfig
-except ImportError :
+except( ModuleNotFoundError, ImportError ):
     from config import ESMConfig
 
 def parseArgs():
@@ -186,7 +186,9 @@ def config(args):
 
 def main():
     args = parseArgs()
-    args.func(args)
+    print(lol)
+    if args.func :
+        args.func(args)
 
 if __name__ == "__main__":
     main()
