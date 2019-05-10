@@ -4,13 +4,16 @@
 """
 
 import unittest
+from unittest import expectedFailure
 import time
+import subprocess, shlex
 import msiem
 import msiem.query
-from msiem.utils import log, getTimes
+from msiem.utils import getTimes
 
 class Tests(unittest.TestCase):
 
+   
     def test_QueryBase(self):
         
 
@@ -61,11 +64,53 @@ class Tests(unittest.TestCase):
         a2=msiem.query.Alarm(summary='very important')
         a3=msiem.query.Alarm(summary='normal')
         a4=msiem.query.Alarm(summary='a little bit important')
-        filtered = query._filter([a1,a2,a3,a4])
-        self.assertNotIn(a1, filtered, 'Basic alarm field based filter is not working.')
-        self.assertNotIn(a3, filtered, 'Basic alarm field based filter is not working.')
-        self.assertIn(a2, filtered, 'Basic alarm field based filter is not working.')
-        self.assertIn(a4, filtered, 'Basic alarm field based filter is not working.')
+        filtered = query._filter([a1,a2,a3,a4], alarmonly=True)
+        self.assertNotIn(a1, filtered, 'Basic alarm field filter is not working.')
+        self.assertNotIn(a3, filtered, 'Basic alarm field filter is not working.')
+        self.assertIn(a2, filtered, 'Basic alarm field filter is not working.')
+        self.assertIn(a4, filtered, 'Basic alarm field filter is not working.')
+
+        query = msiem.query.AlarmQuery(time_range='LAST_3_DAYS', filters=('sum', 'or'))
+        filtered = query._filter([a1,a2,a3,a4], alarmonly=True)
+        self.assertNotIn(a1, filtered, 'Basic alarm equivalent field filter is not working.')
+        self.assertIn(a3, filtered, 'Basic alarm equivalent field  filter is not working.')
+        self.assertIn(a2, filtered, 'Basic alarm  equivalentfield  filter is not working.')
+        self.assertIn(a4, filtered, 'Basic alarm equivalent field based filter is not working.')
+
+        
+        query=msiem.query.AlarmQuery(
+            time_range='LAST_3_DAYS',
+            start_time=None,
+            end_time=None,
+            status='unacknowledged',
+            filters=['assignee=a user',
+                'ackuser=not __ same user =&ˆ%$#@ˆ%#ˆfF$F$$::',
+                'protocol=udp'],
+        )
+        self.assertIn(('assignee',['a user']),query._alarm_filters)
+        self.assertIn(('acknowledgedUsername',['not __ same user =&ˆ%$#@ˆ%#ˆfF$F$$::']),query._alarm_filters)
+        self.assertIn(('protocol',['udp']),query._event_filters)
+        
+        with self.assertRaisesRegex(msiem.exceptions.ESMException, "Illegal filter"):
+            query=msiem.query.AlarmQuery(
+            time_range='LAST_3_DAYS',
+            filters=['assignee=a user',
+                'just a random field = whatever',
+                'protocol=udp'],
+        )
+
+        query=msiem.query.AlarmQuery(
+            time_range='CUSTOM',
+            start_time='2019-05-10T12:00:00',
+            end_time='2019-05-10T14:00:00',
+            status='unacknowledged',
+            filters=['assignee=a user',
+                'ackuser=not __ same user =&ˆ%$#@ˆ%#ˆfF$F$$::',
+                'protocol=udp']
+        )
+        self.assertIn('2019',query.start_time)
+        self.assertIn('2019',query._end_time)
+
 
     def test_EventFilter(self):
         f = msiem.query.FieldFilter(
@@ -191,5 +236,19 @@ class Tests(unittest.TestCase):
             }
         )
         
+    @staticmethod
+    def command(cmd):
+        return str(subprocess.run(shlex.split(cmd), capture_output=True).stdout)
+
+    @expectedFailure
+    def test_Command(self):
+        help_msg=self.command('msiem --help')
+        self.assertRegex(help_msg, 'McAfee SIEM Command Line Interface and Python API')
+
+        msg=self.command("msiem alarms --filters 'srcip=10.0' 'dstip=10.0'")
+        self.assertRegex(msg, '10.0')
+
+"""
 if __name__ == '__main__':
     unittest.main()
+    """

@@ -7,9 +7,10 @@ import time
 import concurrent.futures
 from tqdm import tqdm
 from abc import abstractmethod, abstractproperty
-from .session import ESMObject
+from prettytable import PrettyTable
+from .session import ESMObject, ESMSession
 from .exceptions import ESMException
-from .utils import log, getTimes, regexMatch
+from .utils import getTimes, regexMatch
 from .constants import (POSSIBLE_TIME_RANGE,
     POSSIBLE_FIELD_TYPES, 
     POSSIBLE_OPERATORS, 
@@ -18,28 +19,38 @@ from .constants import (POSSIBLE_TIME_RANGE,
     POSSBILE_ROW_ORDER,
     DEFAULTS_EVENT_FIELDS,
     ALARM_FILTER_FIELDS,
-    ALARM_EVENT_FILTER_FIELDS)
+    ALARM_EVENT_FILTER_FIELDS,
+    ALARM_DEFAULT_FIELDS)
 
 class QueryBase(ESMObject):
     def __init__(self, time_range=None, start_time=None, end_time=None):
         super().__init__()
 
+        self._session._logger.debug("Creating query with times : "+str(locals()))
+
         #Declaring attributes
         self._time_range=str()
         self._start_time=str()
         self._end_time=str()
+
+        timeIssue=True
         
         #init attributes
-        if time_range and time_range is not 'CUSTOM':
+        if time_range is not None :
             self.time_range=time_range
+            timeIssue=False
 
-        elif start_time and end_time :
+        if start_time is not None and end_time is not None :
             self.time_range='CUSTOM'
-            self.start_time=start_time
-            self.end_time=end_time
+            self._start_time=start_time
+            self._end_time=end_time
+            timeIssue=False
 
-        else :
+        if timeIssue :
             raise ESMException("The query must have valid time specifications. Please refer to documentation.")
+
+    def __str__(self):
+        return str(self.__dict__)
 
     @property
     def time_range(self):
@@ -214,22 +225,34 @@ class AlarmQuery(QueryBase):
         Set the page number. Which page of alarms we want to return (default is 1)
         """
         self._page_number=page_number
-        
+
     def add_filter(self, afilter):
         """
             Make sure the filters format is tuple(field, list(values in string))
+            Takes also care of the differents synonims fields can have
         """
-        
-        values = afilter[1] if isinstance(afilter[1], list) else [afilter[1]]
-        values = [str(v) for v in values]
 
-        if afilter[0] in ALARM_FILTER_FIELDS :
-            self._alarm_filters.append((afilter[0], values))
-        
-        elif afilter[0] in ALARM_EVENT_FILTER_FIELDS :
-            self._event_filters.append((afilter[0], values))
-        
-        else:
+        if isinstance(afilter,str):
+            afilter = afilter.split('=',1)
+        try:
+            values = afilter[1] if isinstance(afilter[1], list) else [afilter[1]]
+            values = [str(v) for v in values]
+            added=False
+
+            for synonims in ALARM_FILTER_FIELDS :
+                if afilter[0] in synonims :
+                    self._alarm_filters.append((synonims[0], values))
+                    added=True
+
+            for synonims in ALARM_EVENT_FILTER_FIELDS :
+                if afilter[0] in synonims :
+                    self._event_filters.append((synonims[0], values))
+                    added=True
+
+        except IndexError:
+            added = False
+
+        if not added :
             raise ESMException("Illegal filter field value : "+afilter[0]+". The filter field must be in :"+str(ALARM_FILTER_FIELDS + ALARM_EVENT_FILTER_FIELDS))
 
     def execute(self):
@@ -239,7 +262,10 @@ class AlarmQuery(QueryBase):
         """
 
         resp=None
-        if self.time_range is 'CUSTOM' :
+
+        self._session._logger.debug("Query state at the moment of execution : "+str(self.__dict__))
+
+        if self.time_range == 'CUSTOM' :
             resp=self.esmRequest(
                 'get_alarms_custom_time',
                 time_range=self.time_range,
@@ -265,9 +291,9 @@ class AlarmQuery(QueryBase):
             alarms.append(alarm)
         
         if len(alarms) == 5000:
-            log.warning("The maximum amount of alarms was retreived from the SIEM, some alarms are ignored refine your time range or status to avoid this.")
+            self._session._logger.warning("The maximum amount of alarms was retreived from the SIEM, some alarms are ignored refine your time range or status to avoid this.")
 
-        return self._filter(alarms)
+        return AlarmCollection(self._filter(alarms))
 
     def _alarm_match(self, alarm):
         match=True
@@ -299,25 +325,18 @@ class AlarmQuery(QueryBase):
     def _detailled_alarm(alarm):
         return alarm.detailed
 
-    def _filter(self, alarms):
+    def _filter(self, alarms, alarmonly=False):
         
         alarms = [a for a in alarms if self._alarm_match(a)]
         
-        if len(self._event_filters) > 0:
-            detailed=None
+        detailed=None
 
-            #TODO USE THE ROOT EXECUTOR
-            
-            with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
-                log.info("Getting alarms infos... Please be patient.")
-                detailed = list(tqdm(executor.map(self._detailled_alarm, alarms), total=len(alarms)))
-
+        if not alarmonly :
+            self._session._logger.info("Getting alarms infos... Please be patient.")
+            detailed = list(tqdm(self._session._executor.map(self._detailled_alarm, alarms), total=len(alarms)))
             alarms = [a for a in detailed if self._event_match(a)]
-        
-        else :
-            log.info("Alarms are not filtered based on event fields. Filtering is thus very fast.")
 
-        log.info(str(len(alarms)) + " alarms matching your filter(s)")
+        self._session._logger.info(str(len(alarms)) + " alarms matching your filter(s)")
         return alarms
 
 class Alarm(ESMObject):
@@ -371,7 +390,12 @@ class Alarm(ESMObject):
 
     @property
     def status(self):
-        return('unacknowledged' if (self.acknowledgedDate == '' and self.acknowledgedUsername =='') else 'acknowledged')
+        return('acknowledged' if (
+            (self.acknowledgedDate is None or len(self.acknowledgedDate)>0) 
+            and 
+            (self.acknowledgedUsername is None or len(self.acknowledgedUsername)>0)
+            )
+            else 'unacknowledged')
 
     def delele(self):
         if self._hasID() :
@@ -393,6 +417,38 @@ class Alarm(ESMObject):
         else :
             raise ESMException("Looks like this alarm doesn't have a valid ID. Cannot unacknowledge.")
         return  
+
+class AlarmCollection(list, ESMObject):
+    def __init__(self, alarms):
+        super().__init__()
+        self+=alarms
+
+    def _ack(self, alarm):
+        return alarm.acknowledge()
+
+    def _unack(self, alarm):
+        return alarm.unacknowledge()
+
+    def acknowledge(self):
+        ESMSession()._logger.info("Ackowledging alarms...")
+        ESMSession()._executor.map(self._ack, self)
+
+    def unacknowledge(self):
+        ESMSession()._logger.info("Unackowledging alarms...")
+        ESMSession()._executor.map(self._unack, self)
+
+    def show(self, additionnalFields=[], sortBy=None):
+        table = PrettyTable()
+        table.field_names=[f[0] for f in ALARM_FILTER_FIELDS]+['status']+[f[0] for f in ALARM_EVENT_FILTER_FIELDS]
+        for a in self :
+            table.add_row(
+                [a.__dict__[f[0]] for f in ALARM_FILTER_FIELDS]+[a.status]+
+                [ (a.events[0][f[0]] if len(a.events)>0 else 'No event') for f in ALARM_EVENT_FILTER_FIELDS])
+
+        print(table.get_string(fields=ALARM_DEFAULT_FIELDS+additionnalFields, sortby=sortBy))
+
+    def json(self):
+        return None
 
 class DetailedAlarm(Alarm):
     """
@@ -439,11 +495,13 @@ class DetailedAlarm(Alarm):
         self.actions = ''
         """
 
-        self._events = list()
+        self._events=list()
 
         resp = self.esmRequest('get_alarm_details', id=alarm.id)
 
         self.__dict__.update(resp)
+
+        self.id = alarm.id
 
         self._events = resp['events']
 
@@ -626,7 +684,7 @@ class EventQuery(QueryBase):
                 self._end_time=times[1]
 
             except ESMException :
-                log.warning('The choosen time range is not fully supported. This mean that only the first page of events will be returned. '+str(ESMException))
+                self._session._logger.warning('The choosen time range is not fully supported. This mean that only the first page of events will be returned. '+str(ESMException))
                 self._time_range=time_range
         else :
             self._time_range=time_range
@@ -668,7 +726,7 @@ class EventQuery(QueryBase):
                 includeTotal=False
                 )
         
-        log.debug("EsmRunningQuery object : "+str(self._query))
+        self._session._logger.debug("EsmRunningQuery object : "+str(self._query))
 
         if self._waitFor(self._query['resultID']):
             self._executed = True
@@ -676,7 +734,7 @@ class EventQuery(QueryBase):
         return (self.getEvents())
 
     def _waitFor(self, resultID):
-        log.debug("Waiting for the query to be executed on the SIEM...")
+        self._session._logger.debug("Waiting for the query to be executed on the SIEM...")
         while True:
             status = self.esmRequest('query_status', resultID=resultID)
             if status : 

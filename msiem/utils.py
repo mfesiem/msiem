@@ -15,7 +15,7 @@ from datetime import datetime, timedelta
 
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 
-def getLog(v=True, logfile=None):
+def getLogger(v=False, logfile=None):
 
     log = logging.getLogger()
     log.setLevel(logging.DEBUG)
@@ -40,8 +40,6 @@ def getLog(v=True, logfile=None):
         log.addHandler(fh)
 
     return (log)
-
-log = getLog()
 
 def dehexify(data):
     """
@@ -110,12 +108,10 @@ def timethis(func):
 def tob64(s):
     if type(s) is str:
         return base64.b64encode(s.encode('utf-8')).decode()
-    log.warning("Trying to convert non string object to b64")
 
 def fromb64(s):
     if type(s) is str:
         return base64.b64decode(s.encode('utf-8')).encode()
-    log.warning("Trying to convert non string object from b64")
 
 def getTimes(timeFrame):
     t=timeFrame
@@ -174,7 +170,6 @@ def getTimes(timeFrame):
         pass"""
 
 def regexMatch(regex, string):
-    log.debug
     if re.search(regex, string):
         return True
     else:

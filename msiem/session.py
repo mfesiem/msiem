@@ -19,7 +19,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 from .params import PARAMS
 from .constants import BASE_URL, BASE_URL_PRIV, ASYNC_MAX_WORKERS, GENERAL_POST_TIMEOUT
 from .exceptions import ESMException
-from .utils import log, tob64
+from .utils import tob64, getLogger
 from .config import ESMConfig
         
 
@@ -38,7 +38,7 @@ class ESMSession():
 
     def __new__(cls, *args, **kwargs):
         if ESMSession._instance is None :
-            log.debug('Creating a new instance of ESMSession')
+            self._logger.debug('Creating a new instance of ESMSession')
             ESMSession._instance = ABC.__new__(cls, *args, **kwargs)
 
         return ESMSession._instance
@@ -52,6 +52,7 @@ class ESMSession():
         if not self._initiated :
             #Config parsing
             self._config = ESMConfig(path=conf_path, **config)
+            self._logger = getLogger(v=self._config.getboolean('general', 'verbose'))
             self._executor = ThreadPoolExecutor(max_workers=ASYNC_MAX_WORKERS)
             self._headers={'Content-Type': 'application/json'}
             self._logged=False
@@ -73,10 +74,6 @@ class ESMSession():
         except Exception :
             raise ESMException("Login failed")
 
-        if self.esmRequest('get_user_locale') == False :
-            log.error("Login failed")
-            raise ESMException("Login failed")
-
         else :
             return True
 
@@ -86,7 +83,9 @@ class ESMSession():
         
     """
 
-    def esmRequest(self, method, callback=None, raw=False, secure=False, asynch=False, **params):
+    def esmRequest(self, method, callback=None, raw=False, secure=False, **params):
+
+        self._logger.debug("Calling esmRequest with params :"+str(params))
 
         method, data = PARAMS.get(method)
 
@@ -99,18 +98,18 @@ class ESMSession():
 
         post=dict()
 
-        if not self._logged and method is not 'login':
-            self._login()
+        if not self._logged and method != 'login':
+            self._logged=self._login()
 
         try :
-            post = self._post(method, data, callback, raw, secure, asynch)
+            post = self._post(method, data, callback, raw, secure)
             return post
 
         except Exception as err:
-            log.error(str(err))
-            return False
+            self._logger.error(str(err))
+            raise err
 
-    def _post(self, method=None, data=None, callback=None, raw=False, secure=False, asynch=False):
+    def _post(self, method=None, data=None, callback=None, raw=False, secure=False):
         """
         Helper method
         If method is all upper cases, a private API is done.
@@ -134,36 +133,21 @@ class ESMSession():
             if data:
                 data = json.dumps(data)
 
-        log.debug('POSTING : '+method)
-        if not secure :
-            if data :
-                log.debug('DATA    : '+data)
+        self._logger.debug('POSTING : ' + method + ('\nDATA'+(data if data is not None else '') if not secure else ''))
+        #self._logger.debug(self.__dict__)
 
         try :
-            if asynch :
-                future = self._executor.submit(
-                    requests.post, 
-                    urljoin(url.format(self._config.get('esm', 'host')), method),
-                    data=data, 
-                    headers=self._headers,
-                    verify=self._config.getboolean('general','ssl_verify'),
-                    timeout=GENERAL_POST_TIMEOUT
-                    )
-
-                result = future.result()
-
-            elif not asynch :
-                result = requests.post(
-                    urljoin(url.format(self._config.get('esm', 'host')), method),
-                    data=data, 
-                    headers=self._headers,
-                    verify=self._config.getboolean('general','ssl_verify'),
-                    timeout=GENERAL_POST_TIMEOUT
-                )
+            result = requests.post(
+                urljoin(url.format(self._config.get('esm', 'host')), method),
+                data=data, 
+                headers=self._headers,
+                verify=self._config.getboolean('general','ssl_verify'),
+                timeout=GENERAL_POST_TIMEOUT
+            )
 
             if not secure :
                 pass
-                #log.debug('RESULT : '+result.text)
+                #self._logger.debug('RESULT : '+result.text)
 
             if raw :
                 return result
@@ -173,7 +157,7 @@ class ESMSession():
                     result.raise_for_status()
 
                 except requests.HTTPError as e :
-                    log.error(str(e)+' '+str(result.text))
+                    self._logger.error(str(e)+' '+str(result.text))
 
                 else: #
                     try:
@@ -192,16 +176,16 @@ class ESMSession():
                     return result
 
         except ConnectionError as e:
-            log.critical(e)
+            self._logger.critical(e)
             raise
         except requests.exceptions.Timeout as e:
-            log.error(e)
+            self._logger.error(e)
             pass
         except requests.exceptions.TooManyRedirects as e :
-            log.error(e)
+            self._logger.error(e)
             pass
         except Exception as e:
-            log.error(e)
+            self._logger.error(e)
         
     @staticmethod
     def _format_params(cmd, **params):

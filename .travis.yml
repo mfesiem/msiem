@@ -25,4 +25,4 @@ before_install: sudo apt-get install python3
 install: pip3 install msiem
 # 'python' points to Python 2.7 on macOS but points to Python 3.7 on Linux and Windows
 # 'python3' is a 'command not found' error on Windows but 'py' works on Windows only
-script: python3 setup.py test || python setup.py test
+script: python3 -m unittest tests.tests || python -m unittest tests.tests
