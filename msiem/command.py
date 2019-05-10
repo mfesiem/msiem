@@ -7,7 +7,7 @@ import argparse
 from .config import ESMConfig
 from .session import ESMSession
 from .query import AlarmQuery, Alarm, EventQuery, Event
-from .constants import POSSIBLE_TIME_RANGE
+from .constants import POSSIBLE_TIME_RANGE, ALARM_FILTER_FIELDS, ALARM_FILTER_FIELDS
 
 lol="""
 What it could look like :
@@ -196,6 +196,25 @@ def parseArgs():
 
     alarm_command.add_argument('--filters', '-f', metavar="'<key>=<match>'", nargs='+', type=str, help="List of filters")
 
+    alarm_command.add_argument('--summary', metavar="filter", help="Alarm summary filter")
+    alarm_command.add_argument('--assignee', metavar="assignee", help="Alarm assignee filter")
+    alarm_command.add_argument('--severity', metavar="severity", help="Alarm severity filter")
+    alarm_command.add_argument('--trigdate', metavar="trigdate", help="Alarm trigdate filter")
+    alarm_command.add_argument('--ackdate', metavar="ackdate", help="Alarm ackdate filter")
+    alarm_command.add_argument('--ackuser', metavar="ackuser", help="Alarm ackuser filter")
+    alarm_command.add_argument('--name', metavar="name", help="Alarm name filter")
+
+    alarm_command.add_argument('--msg', metavar="msg", help="Event msg filter")
+    alarm_command.add_argument('--count', metavar="count", help="Event count filter")
+    alarm_command.add_argument('--srcip', metavar="srcip", help="Event srcip filter")
+    alarm_command.add_argument('--dstip', metavar="dstip", help="Event dstip filter")
+    alarm_command.add_argument('--protocol', metavar="protocol", help="Event protocol filter")
+    alarm_command.add_argument('--date', metavar="date", help="Event date filter")
+    alarm_command.add_argument('--subtype', metavar="subtype", help="Event subtype filter")
+
+
+
+
     return (parser.parse_args())
 
 def config(args):
@@ -207,13 +226,17 @@ def config(args):
         ESMConfig().show()
 
 def alarms(args):
-    
+
+    #filter out the filters 
+    params = [fil for fil in vars(args) if any(vars(args)[fil] in synonims for synonims in ALARM_FILTER_FIELDS+ALARM_FILTER_FIELDS)]
+
     alarms=AlarmQuery(
         time_range=args.time_range,
         start_time=args.start_time,
         end_time=args.end_time,
         status=args.status,
-        filters=args.filters
+        filters=list(args.filters)+[
+            (filterf, vars(args)[filterf]) for filterf in [vars(args) if ]]
     ).execute()
 
     if len(alarms) >0:

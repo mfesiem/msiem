@@ -140,7 +140,7 @@ ALARM_EVENT_FILTER_FIELDS=[("eventId",),
 ("ruleMessage",'msg','rulemsg'),
 ("eventCount",'count'),
 ("sourceIp",'srcip'),
-("destIp",'destip'),
+("destIp",'dstip'),
 ("protocol",'prot'),
 ("lastTime",'date'),
 ("eventSubType",'subtype')]
