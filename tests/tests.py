@@ -9,7 +9,7 @@ import time
 import subprocess, shlex
 import msiem
 import msiem.query
-from msiem.utils import log, getTimes
+from msiem.utils import getTimes
 
 class Tests(unittest.TestCase):
 
@@ -64,14 +64,14 @@ class Tests(unittest.TestCase):
         a2=msiem.query.Alarm(summary='very important')
         a3=msiem.query.Alarm(summary='normal')
         a4=msiem.query.Alarm(summary='a little bit important')
-        filtered = query._filter([a1,a2,a3,a4])
+        filtered = query._filter([a1,a2,a3,a4], alarmonly=True)
         self.assertNotIn(a1, filtered, 'Basic alarm field filter is not working.')
         self.assertNotIn(a3, filtered, 'Basic alarm field filter is not working.')
         self.assertIn(a2, filtered, 'Basic alarm field filter is not working.')
         self.assertIn(a4, filtered, 'Basic alarm field filter is not working.')
 
         query = msiem.query.AlarmQuery(time_range='LAST_3_DAYS', filters=('sum', 'or'))
-        filtered = query._filter([a1,a2,a3,a4])
+        filtered = query._filter([a1,a2,a3,a4], alarmonly=True)
         self.assertNotIn(a1, filtered, 'Basic alarm equivalent field filter is not working.')
         self.assertIn(a3, filtered, 'Basic alarm equivalent field  filter is not working.')
         self.assertIn(a2, filtered, 'Basic alarm  equivalentfield  filter is not working.')
@@ -85,12 +85,10 @@ class Tests(unittest.TestCase):
             status='unacknowledged',
             filters=['assignee=a user',
                 'ackuser=not __ same user =&ˆ%$#@ˆ%#ˆfF$F$$::',
-                'eventseverity=90',
                 'protocol=udp'],
         )
         self.assertIn(('assignee',['a user']),query._alarm_filters)
         self.assertIn(('acknowledgedUsername',['not __ same user =&ˆ%$#@ˆ%#ˆfF$F$$::']),query._alarm_filters)
-        self.assertIn(('severity',['90']),query._event_filters)
         self.assertIn(('protocol',['udp']),query._event_filters)
         
         with self.assertRaisesRegex(msiem.exceptions.ESMException, "Illegal filter"):
@@ -98,9 +96,21 @@ class Tests(unittest.TestCase):
             time_range='LAST_3_DAYS',
             filters=['assignee=a user',
                 'just a random field = whatever',
-                'eventseverity=90',
                 'protocol=udp'],
         )
+
+        query=msiem.query.AlarmQuery(
+            time_range='CUSTOM',
+            start_time='2019-05-10T12:00:00',
+            end_time='2019-05-10T14:00:00',
+            status='unacknowledged',
+            filters=['assignee=a user',
+                'ackuser=not __ same user =&ˆ%$#@ˆ%#ˆfF$F$$::',
+                'protocol=udp']
+        )
+        self.assertIn('2019',query.start_time)
+        self.assertIn('2019',query._end_time)
+
 
     def test_EventFilter(self):
         f = msiem.query.FieldFilter(
@@ -237,7 +247,6 @@ class Tests(unittest.TestCase):
 
         msg=self.command("msiem alarms --filters 'srcip=10.0' 'dstip=10.0'")
         self.assertRegex(msg, '10.0')
-        log.info(help_msg)
 
 """
 if __name__ == '__main__':

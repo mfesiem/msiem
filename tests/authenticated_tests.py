@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-=
 
 import unittest
+import time
 import msiem
 import msiem.query
 from msiem.session import ESMSession
-from msiem.utils import log, getTimes
+from msiem.utils import getTimes
 
 class SessionTests(unittest.TestCase):
     """
@@ -26,17 +27,18 @@ class QueryTests(unittest.TestCase):
 
     def test_Alarms(self):
 
-        alarms=msiem.query.AlarmQuery(time_range='LAST_3_DAYS').execute()
+        alarms=msiem.query.AlarmQuery(time_range='LAST_HOUR').execute()
         self.assertGreater(len(alarms),0, "It looks like no alarms were trigered for the last 3 days.")
         
         #1 checks if fields are filled
-        for alarm in msiem.query.AlarmQuery(time_range='LAST_3_DAYS').execute() :
+        alarms = msiem.query.AlarmQuery(time_range='LAST_HOUR').execute()
+        for alarm in alarms:
             self.assertGreater(alarm.id['value'], 0)
             self.assertGreater(len(alarm.triggeredDate), 0)
             self.assertGreater(len(alarm.alarmName), 0)
 
         #2 will fails if the last alarm doesn't have event(s) associated
-        alarms = msiem.query.AlarmQuery(time_range='LAST_3_DAYS').execute()
+        alarms = msiem.query.AlarmQuery(time_range='LAST_HOUR').execute()
         alarm = alarms.pop().detailed
         self.assertGreater(len(alarm.events), 0, "will fails if the last alarm doesn't have event(s) associated")
 
@@ -44,19 +46,28 @@ class QueryTests(unittest.TestCase):
         with self.assertRaises(Exception):
             msiem.query.Alarm(id={'value':-1}).detailed
 
-        for alarm in msiem.query.AlarmQuery(time_range='LAST_3_DAYS', status='unacknowledged').execute():
+        for alarm in msiem.query.AlarmQuery(time_range='LAST_HOUR', status='unacknowledged').execute():
             self.assertEqual(alarm.acknowledgedDate,  '')
-            self.assertEqual(alarm.acknowledgedUsername, '')
-        
-        for alarm in msiem.query.AlarmQuery(time_range='PREVIOUS_WEEK', page_size=2, status='acknowledged').execute():
+            self.assertEqual(alarm.acknowledgedUsername, None)
+
+        alarms = msiem.query.AlarmQuery(
+            time_range='CUSTOM',
+            start_time='2019-05-08',
+            end_time='2019-05-09',
+            status='acknowledged').execute()
+        self.assertGreater(len(alarms), 0, "Can't get alarms with custom time !")
+
+        """
+        for alarm in msiem.query.AlarmQuery(time_range='PREVIOUS_WEEK', page_size=1, status='acknowledged').execute():
             alarm.unacknowledge()
-            time.sleep(20)
+            time.sleep(40)
             alarm=msiem.query.DetailedAlarm(alarm)
             self.assertEqual(alarm.status, 'unacknowledged')
             alarm.acknowledge()
-            time.sleep(20)
+            time.sleep(40)
             alarm=msiem.query.DetailedAlarm(alarm)
             self.assertEqual(alarm.status, 'acknowledged')
+            """
 
     def test_EventQuery(self):
 
@@ -80,7 +91,7 @@ class QueryTests(unittest.TestCase):
         )
 
         events = query.execute()
-        log.debug("Got "+str(len(events))+" events !")
+        print("Got "+str(len(events))+" events !")
 
         query = msiem.query.EventQuery(
             filters=[('DstIP', ['10.0.0.0/8'])],
@@ -91,10 +102,10 @@ class QueryTests(unittest.TestCase):
         )
 
         events2 = query.execute()
-        log.debug("Got "+str(len(events2))+" events !")
+        print("Got "+str(len(events2))+" events !")
 
-        log.debug(events[0])
-        log.debug(events2[0])
+        print(events[0])
+        print(events2[0])
 
         self.assertEqual(events, events2, 'This test will fail if the offset parameter gets fixed on the SIEM side')
 
@@ -143,6 +154,7 @@ class QueryTests(unittest.TestCase):
         pass
 
     def test_AlarmFilter(self):
+        
         
         with self.assertRaisesRegex(msiem.exceptions.ESMException, 'Illegal filter'):
             filtered = msiem.query.AlarmQuery(

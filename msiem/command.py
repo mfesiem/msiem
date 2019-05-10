@@ -3,6 +3,12 @@
     msiem command
 """
 
+import argparse
+from .config import ESMConfig
+from .session import ESMSession
+from .query import AlarmQuery, Alarm, EventQuery, Event
+from .constants import POSSIBLE_TIME_RANGE
+
 lol="""
 What it could look like :
 
@@ -160,12 +166,7 @@ msiem elm
     
 """
 
-import argparse
-from .config import ESMConfig
-from .session import ESMSession
-from .query import AlarmQuery, Alarm, EventQuery, Event
-from .utils import log, parseListToDict
-from .constants import POSSIBLE_TIME_RANGE
+
 
 def parseArgs():
     parser = argparse.ArgumentParser(description='McAfee SIEM Command Line Interface and Python API',
@@ -173,53 +174,64 @@ def parseArgs():
                 formatter_class=argparse.RawTextHelpFormatter)
 
     parser.add_argument('--version', help="Show version",action="store_true")
-    parser.add_argument('-v' '--verbose', help="Increase output verbosity",action="store_true")
+    parser.add_argument('-v', '--verbose', help="Increase output verbosity",action="store_true")
 
     commands = parser.add_subparsers()
 
     config_command = commands.add_parser('config')
     config_command.set_defaults(func=config)
     config_command.add_argument('--list', help="List configuration fields", action="store_true")
-    config_command.add_argument('--set')
+    config_command.add_argument('--set', help="Will inveractively prompt for configuration settings", action="store_true")
 
     alarm_command = commands.add_parser('alarms')
     alarm_command.set_defaults(func=alarms)
     alarm_command.add_argument('--ack', help="Acknowledge the alarms", action="store_true")
     alarm_command.add_argument('--unack', help="Unacknowledge the alarms", action="store_true")
+    alarm_command.add_argument('--delete', help="Delete the alarms", action="store_true")
+    
+    alarm_command.add_argument('--time_range','-t', metavar='time_range', help='Timerange in'+str(POSSIBLE_TIME_RANGE))
+    alarm_command.add_argument('--start_time','--t1', metavar='time', help='Start trigger date')
+    alarm_command.add_argument('--end_time','--t2', metavar='time', help='End trigger date')
+    alarm_command.add_argument('--status', metavar='status', help='Status of the alarm [ack|unack|all]')
 
-    alarm_command.add_argument('--tr','--time_range', help='Timerange in'+str(POSSIBLE_TIME_RANGE), required=True)
-    alarm_command.add_argument('--st','--start_time', help='Start acknowledge date')
-    alarm_command.add_argument('--et','--end_time', help='Start acknowledge date')
-    alarm_command.add_argument('--status', help='Status of the alarm [ack|unack|all]')
-
-    alarm_command.add_argument('--filters', nargs='+', type=str, help="List of filters")
+    alarm_command.add_argument('--filters', '-f', metavar="'<key>=<match>'", nargs='+', type=str, help="List of filters")
 
     return (parser.parse_args())
 
 def config(args):
-    config=ESMConfig()
+
     if args.set :
-        if 'auth' in args.set :
-            config.setAuth()
-            config.write()
+        ESMConfig().interactiveSet()
+
+    if args.list :
+        ESMConfig().show()
 
 def alarms(args):
     
-    query=AlarmQuery(
+    alarms=AlarmQuery(
         time_range=args.time_range,
         start_time=args.start_time,
         end_time=args.end_time,
         status=args.status,
         filters=args.filters
-        )
+    ).execute()
 
-    log.info(query)
+    if len(alarms) >0:
+
+        alarms.show()
+
+        if args.ack and 'y' in input('Are you sure you want to acknowledge those alarms ? [y/n]'):
+            alarms.acknowledge()
+
+        if args.unack and 'y' in input('Are you sure you want to unacknowledge those alarms ? [y/n]'):
+            alarms.unacknowledge()
 
 def main():
     args = parseArgs()
-    print(lol)
-    if args.func :
+
+    if hasattr(args, 'func') :
         args.func(args)
+    
 
 if __name__ == "__main__":
     main()

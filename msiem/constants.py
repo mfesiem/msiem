@@ -5,13 +5,13 @@
 BASE_URL = 'https://{}/rs/esm/'
 BASE_URL_PRIV = 'https://{}/ess'
 
-ASYNC_MAX_WORKERS=10
+ASYNC_MAX_WORKERS=15
 GENERAL_POST_TIMEOUT=30
 
 CONFIG_FILE_NAME='.msiem/conf.ini'
 
-DEFAULT_CONFIG_FILE='''
-    ; This file should be located in your securely in your path since it 
+CONFIG_FILE_DISCLAMER='''
+    ; The configuration file should be located securely in your path since it 
     ; has credentials.
     ; 
     ; For Windows:  %APPDATA%\\\\'''+CONFIG_FILE_NAME+'''
@@ -19,14 +19,13 @@ DEFAULT_CONFIG_FILE='''
     ; For Linux :   $XDG_CONFIG_HOME/'''+CONFIG_FILE_NAME+'''
     ;        or :   $HOME/'''+CONFIG_FILE_NAME+'''
 
-    [general]
-    output=text
-    verbose=yes
-    ssl_verify=no
-    log_file=
+    ; Use command line to setup authentication'''
 
-    ; Use command line to setup authentication
-    
+DEFAULT_CONFIG_FILE='''
+    [general]
+    verbose=no
+    ssl_verify=no
+
     [esm]
     host=
     user=
@@ -125,7 +124,7 @@ DEFAULTS_EVENT_FIELDS=[
  "LastTime"
 ]
 
-ALARM_FILTER_FIELDS = [('id'),
+ALARM_FILTER_FIELDS = [('id',),
 ('summary','sum'),
 ('assignee','user'),
 ('severity','sever'),
@@ -133,16 +132,11 @@ ALARM_FILTER_FIELDS = [('id'),
 ('acknowledgedDate','ackdate'),
 ('acknowledgedUsername','ackuser'),
 ('alarmName','name'),
-
-#The followings are not part of Alarm filters 
-#but are listed here to be considered in the checks
-
 ]
-
 
 ALARM_EVENT_FILTER_FIELDS=[("eventId",),
 #"severity", duplicated in ALARM_FILTER_FIELD
-("severity", "eventseverity",),
+#("severity", "eventseverity",),
 ("ruleMessage",'msg','rulemsg'),
 ("eventCount",'count'),
 ("sourceIp",'srcip'),
@@ -150,4 +144,6 @@ ALARM_EVENT_FILTER_FIELDS=[("eventId",),
 ("protocol",'prot'),
 ("lastTime",'date'),
 ("eventSubType",'subtype')]
+
+ALARM_DEFAULT_FIELDS=['triggeredDate','alarmName','status','sourceIp','destIp','ruleMessage']
 
