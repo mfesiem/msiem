@@ -41,6 +41,9 @@ class QueryBase(ESMObject):
         else :
             raise ESMException("The query must have valid time specifications. Please refer to documentation.")
 
+    def __str__(self):
+        return str(self.__dict__)
+
     @property
     def time_range(self):
         return self._time_range
@@ -214,22 +217,31 @@ class AlarmQuery(QueryBase):
         Set the page number. Which page of alarms we want to return (default is 1)
         """
         self._page_number=page_number
-        
+
     def add_filter(self, afilter):
         """
             Make sure the filters format is tuple(field, list(values in string))
+            Takes also care of the differents synonims fields can have
         """
+
+        if isinstance(afilter,str):
+            afilter = afilter.split('=',1)
         
         values = afilter[1] if isinstance(afilter[1], list) else [afilter[1]]
         values = [str(v) for v in values]
+        added=False
 
-        if afilter[0] in ALARM_FILTER_FIELDS :
-            self._alarm_filters.append((afilter[0], values))
+        for synonims in ALARM_FILTER_FIELDS :
+            if afilter[0] in synonims :
+                self._alarm_filters.append((synonims[0], values))
+                added=True
+
+        for synonims in ALARM_EVENT_FILTER_FIELDS :
+            if afilter[0] in synonims :
+                self._event_filters.append((synonims[0], values))
+                added=True
         
-        elif afilter[0] in ALARM_EVENT_FILTER_FIELDS :
-            self._event_filters.append((afilter[0], values))
-        
-        else:
+        if not added :
             raise ESMException("Illegal filter field value : "+afilter[0]+". The filter field must be in :"+str(ALARM_FILTER_FIELDS + ALARM_EVENT_FILTER_FIELDS))
 
     def execute(self):

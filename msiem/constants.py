@@ -125,23 +125,29 @@ DEFAULTS_EVENT_FIELDS=[
  "LastTime"
 ]
 
-ALARM_FILTER_FIELDS = ['id',
-'summary',
-'assignee',
-'severity',
-'triggeredDate',
-'acknowledgedDate',
-'acknowledgedUsername',
-'alarmName']
+ALARM_FILTER_FIELDS = [('id'),
+('summary','sum'),
+('assignee','user'),
+('severity','sever'),
+('triggeredDate','trigdate'),
+('acknowledgedDate','ackdate'),
+('acknowledgedUsername','ackuser'),
+('alarmName','name'),
+
+#The followings are not part of Alarm filters 
+#but are listed here to be considered in the checks
+
+]
 
 
-ALARM_EVENT_FILTER_FIELDS=["eventId",
-#"severity", ignored cause duplicated in ALARM_FILTER_FIELD
-"ruleMessage",
-"eventCount",
-"sourceIp",
-"destIp",
-"protocol",
-"lastTime",
-"eventSubType"]
+ALARM_EVENT_FILTER_FIELDS=[("eventId",),
+#"severity", duplicated in ALARM_FILTER_FIELD
+("severity", "eventseverity",),
+("ruleMessage",'msg','rulemsg'),
+("eventCount",'count'),
+("sourceIp",'srcip'),
+("destIp",'destip'),
+("protocol",'prot'),
+("lastTime",'date'),
+("eventSubType",'subtype')]
 
