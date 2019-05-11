@@ -419,6 +419,9 @@ class Alarm(ESMObject):
         return  
 
 class AlarmCollection(list, ESMObject):
+    """
+        Double inheritance doesn't seem to work as expected, need to call ESMSession()
+    """
     def __init__(self, alarms):
         super().__init__()
         self+=alarms

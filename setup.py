@@ -13,7 +13,7 @@ setup(
     name='msiem',
     description="McAfee SIEM Command Line Interface and Python API",
     url='https://github.com/tristanlatr/msiem',
-    version='0.0.3',
+    version='0.0.4',
     packages=['msiem',],
     entry_points = {
         'console_scripts': ['msiem=msiem.command:main'],

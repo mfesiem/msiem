@@ -7,7 +7,7 @@ import argparse
 from .config import ESMConfig
 from .session import ESMSession
 from .query import AlarmQuery, Alarm, EventQuery, Event
-from .constants import POSSIBLE_TIME_RANGE, ALARM_FILTER_FIELDS, ALARM_FILTER_FIELDS
+from .constants import POSSIBLE_TIME_RANGE, ALARM_FILTER_FIELDS, ALARM_EVENT_FILTER_FIELDS
 
 lol="""
 What it could look like :
@@ -167,7 +167,6 @@ msiem elm
 """
 
 
-
 def parseArgs():
     parser = argparse.ArgumentParser(description='McAfee SIEM Command Line Interface and Python API',
                 usage='Use "msiem --help" for more information',
@@ -178,42 +177,40 @@ def parseArgs():
 
     commands = parser.add_subparsers()
 
-    config_command = commands.add_parser('config')
-    config_command.set_defaults(func=config)
-    config_command.add_argument('--list', help="List configuration fields", action="store_true")
-    config_command.add_argument('--set', help="Will inveractively prompt for configuration settings", action="store_true")
+    config = commands.add_parser('config')
+    config.set_defaults(func=config)
+    config.add_argument('--list', help="List configuration fields", action="store_true")
+    config.add_argument('--set', help="Will inveractively prompt for configuration settings", action="store_true")
 
-    alarm_command = commands.add_parser('alarms')
-    alarm_command.set_defaults(func=alarms)
-    alarm_command.add_argument('--ack', help="Acknowledge the alarms", action="store_true")
-    alarm_command.add_argument('--unack', help="Unacknowledge the alarms", action="store_true")
-    alarm_command.add_argument('--delete', help="Delete the alarms", action="store_true")
+    alarm = commands.add_parser('alarms')
+    alarm.set_defaults(func=alarms)
+    alarm.add_argument('--ack', help="Acknowledge the alarms", action="store_true")
+    alarm.add_argument('--unack', help="Unacknowledge the alarms", action="store_true")
+    alarm.add_argument('--delete', help="Delete the alarms", action="store_true")
     
-    alarm_command.add_argument('--time_range','-t', metavar='time_range', help='Timerange in'+str(POSSIBLE_TIME_RANGE))
-    alarm_command.add_argument('--start_time','--t1', metavar='time', help='Start trigger date')
-    alarm_command.add_argument('--end_time','--t2', metavar='time', help='End trigger date')
-    alarm_command.add_argument('--status', metavar='status', help='Status of the alarm [ack|unack|all]')
+    alarm.add_argument('--time_range','-t', metavar='time_range', help='Timerange in'+str(POSSIBLE_TIME_RANGE))
+    alarm.add_argument('--start_time','--t1', metavar='time', help='Start trigger date')
+    alarm.add_argument('--end_time','--t2', metavar='time', help='End trigger date')
 
-    alarm_command.add_argument('--filters', '-f', metavar="'<key>=<match>'", nargs='+', type=str, help="List of filters")
+    alarm.add_argument('--status', metavar='status', help='Status of the alarm [ack|unack|all]')
 
-    alarm_command.add_argument('--summary', metavar="filter", help="Alarm summary filter")
-    alarm_command.add_argument('--assignee', metavar="assignee", help="Alarm assignee filter")
-    alarm_command.add_argument('--severity', metavar="severity", help="Alarm severity filter")
-    alarm_command.add_argument('--trigdate', metavar="trigdate", help="Alarm trigdate filter")
-    alarm_command.add_argument('--ackdate', metavar="ackdate", help="Alarm ackdate filter")
-    alarm_command.add_argument('--ackuser', metavar="ackuser", help="Alarm ackuser filter")
-    alarm_command.add_argument('--name', metavar="name", help="Alarm name filter")
+    alarm.add_argument('--filters', '-f', metavar="'<key>=<match>'", nargs='+', type=str, help="List of filters")
 
-    alarm_command.add_argument('--msg', metavar="msg", help="Event msg filter")
-    alarm_command.add_argument('--count', metavar="count", help="Event count filter")
-    alarm_command.add_argument('--srcip', metavar="srcip", help="Event srcip filter")
-    alarm_command.add_argument('--dstip', metavar="dstip", help="Event dstip filter")
-    alarm_command.add_argument('--protocol', metavar="protocol", help="Event protocol filter")
-    alarm_command.add_argument('--date', metavar="date", help="Event date filter")
-    alarm_command.add_argument('--subtype', metavar="subtype", help="Event subtype filter")
+    alarm.add_argument('--summary', metavar="sumary", help="Alarm summary filter")
+    alarm.add_argument('--assignee', metavar="assignee", help="Alarm assignee filter")
+    alarm.add_argument('--severity', metavar="severity", help="Alarm severity filter")
+    alarm.add_argument('--trigdate', metavar="trigdate", help="Alarm trigdate filter")
+    alarm.add_argument('--ackdate', metavar="ackdate", help="Alarm ackdate filter")
+    alarm.add_argument('--ackuser', metavar="ackuser", help="Alarm ackuser filter")
+    alarm.add_argument('--name', metavar="name", help="Alarm name filter")
 
-
-
+    alarm.add_argument('--msg', metavar="msg", help="Event msg filter")
+    alarm.add_argument('--count', metavar="count", help="Event count filter")
+    alarm.add_argument('--srcip', metavar="srcip", help="Event srcip filter")
+    alarm.add_argument('--dstip', metavar="dstip", help="Event dstip filter")
+    alarm.add_argument('--protocol', metavar="protocol", help="Event protocol filter")
+    alarm.add_argument('--date', metavar="date", help="Event date filter")
+    alarm.add_argument('--subtype', metavar="subtype", help="Event subtype filter")
 
     return (parser.parse_args())
 
@@ -226,17 +223,29 @@ def config(args):
         ESMConfig().show()
 
 def alarms(args):
+    
+    vargs=vars(args)
 
-    #filter out the filters 
-    params = [fil for fil in vars(args) if any(vars(args)[fil] in synonims for synonims in ALARM_FILTER_FIELDS+ALARM_FILTER_FIELDS)]
+    #Filter out the filters keys from list of parameters based on their names
+    filters = list()
+    for key in vargs :
+        if vargs[key] is not None:
+            for synonims in ALARM_FILTER_FIELDS+ALARM_EVENT_FILTER_FIELDS:
+                if key in synonims :
+                    filters.append((key, vargs[key]))
+    
+    #Merging values from --filters option
+    if args.filters is not None :
+        filters+=args.filters
+
+    print(filters)
 
     alarms=AlarmQuery(
         time_range=args.time_range,
         start_time=args.start_time,
         end_time=args.end_time,
         status=args.status,
-        filters=list(args.filters)+[
-            (filterf, vars(args)[filterf]) for filterf in [vars(args) if ]]
+        filters=filters
     ).execute()
 
     if len(alarms) >0:
