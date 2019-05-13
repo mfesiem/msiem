@@ -102,11 +102,11 @@ POSSIBLE_TIME_RANGE=[
         ]
 
 POSSIBLE_ALARM_STATUS=[
-        'acknowledged',
-        'unacknowledged',
-        '',
-        None
+        ('acknowledged', 'ack',),
+        ('unacknowledged', 'unack',),
+        ('', None, 'all', 'both')
     ]
+
 POSSBILE_ROW_ORDER=[
         'ASCENDING',
         'DESCENDING'

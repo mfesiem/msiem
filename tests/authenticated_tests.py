@@ -107,7 +107,7 @@ class QueryTests(unittest.TestCase):
         print(events[0])
         print(events2[0])
 
-        self.assertEqual(events, events2, 'This test will fail if the offset parameter gets fixed on the SIEM side')
+        self.assertEqual(events[0].__dict__, events2[0].__dict__, 'This test will fail if the offset parameter gets fixed on the SIEM side')
 
     def test_TimeRange(self):
 
@@ -129,7 +129,7 @@ class QueryTests(unittest.TestCase):
             compute_time_range=False
         ).execute()
 
-        self.assertEqual(events, events2, 'Time computed time range and default time range gave differents results. This test can sometimes fail if new events came up in the meantime')
+        self.assertEqual(events[0].__dict__, events2[0].__dict__, 'Time computed time range and default time range gave differents results. This test can sometimes fail if new events came up in the meantime')
 
         timerange = getTimes('LAST_30_MINUTES')
         events=msiem.query.EventQuery(
@@ -149,27 +149,26 @@ class QueryTests(unittest.TestCase):
             #implicit compute_time_range=True
         ).execute()
 
-        self.assertEqual(events, events2, 'The computation itself is wrong. This test can sometimes fail if new events came up in the meantime')
+        self.assertEqual(events[0].__dict__, events2[0].__dict__, 'The computation itself is wrong. This test can sometimes fail if new events came up in the meantime')
 
         pass
 
     def test_AlarmFilter(self):
         
-        
         with self.assertRaisesRegex(msiem.exceptions.ESMException, 'Illegal filter'):
             filtered = msiem.query.AlarmQuery(
-                time_range='LAST_3_DAYS',
+                time_range='LAST_24_HOURS',
                 filters=('whatever', None)
             )
 
         for alarm in (msiem.query.AlarmQuery(
-            time_range='LAST_3_DAYS',
+            time_range='LAST_24_HOURS',
             filters=('alarmName', 'High Severity Event')
             ).execute()) :
             self.assertRegex(alarm.alarmName.lower(), 'High Severity Event'.lower(), 'Filtering alarms is not working')
 
         for alarm in (msiem.query.AlarmQuery(
-            time_range='LAST_3_DAYS',
+            time_range='LAST_24_HOURS',
             filters=[('alarmName', 'High Severity Event'), ('severity', [80,85,90,95,100])]
             ).execute()) :
             self.assertRegex(alarm.alarmName.lower(), 'High Severity Event'.lower(), 'Filtering alarms is not working')

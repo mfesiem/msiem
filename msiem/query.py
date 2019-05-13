@@ -195,15 +195,17 @@ class AlarmQuery(QueryBase):
     @status.setter
     def status(self, status):
         """
-        Set the status filter of the alarm query. 'acknowledged', 'unacknowledged', '' or null -> all (default is '')
+        Set the status filter of the alarm query. 'acknowledged', 'unacknowledged', 'all', '' or null -> all (default is '')
         """
-
+        statusFound=False
         if type(status) is str : 
-            if status.lower() in POSSIBLE_ALARM_STATUS :
-                self._status=status
+            for synonims in POSSIBLE_ALARM_STATUS :
+                if status in synonims :
+                    self._status=synonims[0]
+                    statusFound=True
                 
-            else:
-                raise ESMException("Illegal value of status filter. The status must be in "+str(POSSIBLE_ALARM_STATUS))
+        if not statusFound:
+            raise ESMException("Illegal value of status filter. The status must be in "+str(POSSIBLE_ALARM_STATUS))
 
     @page_size.setter
     def page_size(self, page_size):
@@ -333,7 +335,7 @@ class AlarmQuery(QueryBase):
 
         if not alarmonly :
             self._session._logger.info("Getting alarms infos... Please be patient.")
-            detailed = list(tqdm(self._session._executor.map(self._detailled_alarm, alarms), total=len(alarms)))
+            detailed = list(tqdm(self._session._executor.map(self._detailled_alarm, alarms), total=len(alarms), ascii=True))
             alarms = [a for a in detailed if self._event_match(a)]
 
         self._session._logger.info(str(len(alarms)) + " alarms matching your filter(s)")
@@ -418,9 +420,9 @@ class Alarm(ESMObject):
             raise ESMException("Looks like this alarm doesn't have a valid ID. Cannot unacknowledge.")
         return  
 
-class AlarmCollection(list, ESMObject):
+class AlarmCollection(list):
     """
-        Double inheritance doesn't seem to work as expected, need to call ESMSession()
+        Double inheritance doesn't seem to work as expected, need to call ESMSession() directly
     """
     def __init__(self, alarms):
         super().__init__()
@@ -432,6 +434,15 @@ class AlarmCollection(list, ESMObject):
     def _unack(self, alarm):
         return alarm.unacknowledge()
 
+    def _delete(self, alarm):
+        return alarm.delete()
+
+    def ack(self):
+        self.acknowledge()
+
+    def unack(self):
+        self.unacknowledge()
+
     def acknowledge(self):
         ESMSession()._logger.info("Ackowledging alarms...")
         ESMSession()._executor.map(self._ack, self)
@@ -440,7 +451,14 @@ class AlarmCollection(list, ESMObject):
         ESMSession()._logger.info("Unackowledging alarms...")
         ESMSession()._executor.map(self._unack, self)
 
-    def show(self, additionnalFields=[], sortBy=None):
+    def delete(self):
+        raise ESMException("Not implemented for security reasons.")
+        """
+        ESMSession()._logger.info("Unackowledging alarms...")
+        ESMSession()._executor.map(self._delete, self)
+        """
+
+    def show(self, add_columns=[], sortBy=None):
         table = PrettyTable()
         table.field_names=[f[0] for f in ALARM_FILTER_FIELDS]+['status']+[f[0] for f in ALARM_EVENT_FILTER_FIELDS]
         for a in self :
@@ -448,7 +466,7 @@ class AlarmCollection(list, ESMObject):
                 [a.__dict__[f[0]] for f in ALARM_FILTER_FIELDS]+[a.status]+
                 [ (a.events[0][f[0]] if len(a.events)>0 else 'No event') for f in ALARM_EVENT_FILTER_FIELDS])
 
-        print(table.get_string(fields=ALARM_DEFAULT_FIELDS+additionnalFields, sortby=sortBy))
+        print(table.get_string(fields=ALARM_DEFAULT_FIELDS+add_columns, sortby=sortBy))
 
     def json(self):
         return None
@@ -519,7 +537,10 @@ class DetailedAlarm(Alarm):
 class Event(ESMObject):
     """ Based on EsmTriggeredAlarmEvent """
     def __init__(self, **args):
-        self.fields=dict().update(**args)
+        self.__dict__.update(**args)
+
+    def addNote(self, string):
+        pass
 
 class EventQuery(QueryBase):
     """
@@ -531,28 +552,6 @@ class EventQuery(QueryBase):
 
     def __init__(self, fields=None, filters=None, 
         limit=5000, offset=0, order=None, compute_time_range=True, **args):
-        """
-       
-        fields list of string, need to convert that into list of {
-            "name": "(name)",
-            "typeBits": 0,
-            "id": "(id)"
-            }
-
-        order tuple (direction, field) to list of {
-            "direction": "ASCENDING or DESCENDING",
-            "field": {
-                "name": ""
-                }
-            }
-
-        filters 
-            1 / list of {
-                (field , [values]) #easy mode
-            }
-
-            2 / list of QueryFilter
-        """
 
         self._compute_time_range = compute_time_range
         
@@ -562,7 +561,7 @@ class EventQuery(QueryBase):
         self._type='EVENT'
         self._groupType='NO_GROUP'
 
-        """ Not checking dynamically the velidity of the fields cause makes too much of unecessary requests
+        """ Not checking dynamically the validity of the fields cause makes too much of unecessary requests
         #Singleton attribute mapping
         self._possible_fields = EventQuery._possible_fields
         if self._possible_fields is None :
@@ -640,13 +639,12 @@ class EventQuery(QueryBase):
         """
             Uses BaseQuery.filter base implementation but adds a default filter when None
         """
-        if not filters :
+        if filters is None :
             self.filters = [FieldFilter(name='AvgSeverity', operator='GREATER_THAN' , values=[1])]
         else :
             super(self.__class__, self.__class__).filters.__set__(self, filters)
             #https://bugs.python.org/issue14965
             
-
     def add_filter(self, fil):
         if type(fil) is tuple :
             self._filters.append(FieldFilter(*fil))
@@ -702,8 +700,6 @@ class EventQuery(QueryBase):
         if self.time_range is 'CUSTOM' :
             self._query=self.esmRequest(
                 'event_query_custom_time',
-                asynch=False,
-
                 time_range=self.time_range,
                 start_time=self.start_time,
                 end_time=self.end_time,
@@ -718,8 +714,6 @@ class EventQuery(QueryBase):
         else :
             self._query=self.esmRequest(
                 'event_query',
-                asynch=False,
-
                 time_range=self.time_range,
                 #order=self.order, TODO support order
                 fields=self.fields,
@@ -734,7 +728,7 @@ class EventQuery(QueryBase):
         if self._waitFor(self._query['resultID']):
             self._executed = True
 
-        return (self.getEvents())
+        return (EventCollection(self._getEvents()))
 
     def _waitFor(self, resultID):
         self._session._logger.debug("Waiting for the query to be executed on the SIEM...")
@@ -748,7 +742,7 @@ class EventQuery(QueryBase):
             else :
                 raise ESMException("There was an error while waiting for the query to execute.")
 
-    def getEvents(self, startPos=0, numRows=None):
+    def _getEvents(self, startPos=0, numRows=None):
         if self._executed :
             if not numRows :
                 numRows=self.limit
@@ -765,8 +759,21 @@ class EventQuery(QueryBase):
             event=dict()
             for i in range(len(columns)-1):
                 event.update({columns[i]['name']:row['values'][i]})
-            events.append(event)
+            events.append(Event(**event))
         return events
+
+class EventCollection(list):
+    def __init__(self, events):
+        super().__init__()
+        self+=events
+
+    def show(self, add_columns=[], sortBy=None):
+        table = PrettyTable()
+        table.field_names=[f[0] for f in ALARM_EVENT_FILTER_FIELDS]
+        for a in self :
+            pass #TODO
+
+        print(table.get_string(fields=ALARM_DEFAULT_FIELDS+add_columns, sortby=sortBy))
 
 class QueryFilter(ESMObject):
 
@@ -902,6 +909,3 @@ class FieldFilter(QueryFilter):
 
             elif isinstance(v, (int, float, str)) :
                 self.add_basic_value(v)
-
-
-

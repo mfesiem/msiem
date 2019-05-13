@@ -5,6 +5,7 @@
 
 import argparse
 from .config import ESMConfig
+from .exceptions import ESMException
 from .session import ESMSession
 from .query import AlarmQuery, Alarm, EventQuery, Event
 from .constants import POSSIBLE_TIME_RANGE, ALARM_FILTER_FIELDS, ALARM_EVENT_FILTER_FIELDS
@@ -166,7 +167,6 @@ msiem elm
     
 """
 
-
 def parseArgs():
     parser = argparse.ArgumentParser(description='McAfee SIEM Command Line Interface and Python API',
                 usage='Use "msiem --help" for more information',
@@ -184,11 +184,11 @@ def parseArgs():
 
     alarm = commands.add_parser('alarms')
     alarm.set_defaults(func=alarms)
-    alarm.add_argument('--ack', help="Acknowledge the alarms", action="store_true")
-    alarm.add_argument('--unack', help="Unacknowledge the alarms", action="store_true")
-    alarm.add_argument('--delete', help="Delete the alarms", action="store_true")
-    
-    alarm.add_argument('--time_range','-t', metavar='time_range', help='Timerange in'+str(POSSIBLE_TIME_RANGE))
+
+    alarm.add_argument('--action', metavar="action", help="What to do with the alarms: [ack|unack|delete]")
+    alarm.add_argument('--force', help="Will not prompt for confirmation to do the specified action", action="store_true")
+
+    alarm.add_argument('--time_range','-t', metavar='time_range', help='Timerange: '+str(POSSIBLE_TIME_RANGE))
     alarm.add_argument('--start_time','--t1', metavar='time', help='Start trigger date')
     alarm.add_argument('--end_time','--t2', metavar='time', help='End trigger date')
 
@@ -238,8 +238,6 @@ def alarms(args):
     if args.filters is not None :
         filters+=args.filters
 
-    print(filters)
-
     alarms=AlarmQuery(
         time_range=args.time_range,
         start_time=args.start_time,
@@ -251,12 +249,10 @@ def alarms(args):
     if len(alarms) >0:
 
         alarms.show()
-
-        if args.ack and 'y' in input('Are you sure you want to acknowledge those alarms ? [y/n]'):
-            alarms.acknowledge()
-
-        if args.unack and 'y' in input('Are you sure you want to unacknowledge those alarms ? [y/n]'):
-            alarms.unacknowledge()
+        
+        if args.action is not None :
+            if args.force or ('y' in input('Are you sure you want to '+str(args.action)+' those alarms ? [y/n]')):
+                getattr(alarms, args.action)()
 
 def main():
     args = parseArgs()

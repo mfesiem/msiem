@@ -240,13 +240,14 @@ class Tests(unittest.TestCase):
     def command(cmd):
         return str(subprocess.run(shlex.split(cmd), capture_output=True).stdout)
 
-    @expectedFailure
     def test_Command(self):
         help_msg=self.command('msiem --help')
         self.assertRegex(help_msg, 'McAfee SIEM Command Line Interface and Python API')
 
-        msg=self.command("msiem alarms --filters 'srcip=10.0' 'dstip=10.0'")
+        """
+        msg=self.command("msiem alarms -t LAST_24_HOURS --filters 'srcip=10.0' 'dstip=10.0'")
         self.assertRegex(msg, '10.0')
+        """
 
 """
 if __name__ == '__main__':
