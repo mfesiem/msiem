@@ -7,10 +7,11 @@ import time
 import concurrent.futures
 from tqdm import tqdm
 from abc import abstractmethod, abstractproperty
-from prettytable import PrettyTable
 from .session import ESMObject, ESMSession
 from .exceptions import ESMException
 from .utils import getTimes, regexMatch
+from .event import Event, EventCollection
+from .alarm import Alarm, AlarmCollection
 from .constants import (POSSIBLE_TIME_RANGE,
     POSSIBLE_FIELD_TYPES, 
     POSSIBLE_OPERATORS, 
@@ -24,15 +25,24 @@ from .constants import (POSSIBLE_TIME_RANGE,
 
 class QueryBase(ESMObject):
     def __init__(self, time_range=None, start_time=None, end_time=None):
+        """
+            Common based for all queries that takes care of timerange, start and end times
+            time_range='CUSTOM' not required if  start_time and  end_time  are set.
+            #TODO automated (simultaneous) time frangmentation to cover bigger timeranges.
+        """
         super().__init__()
 
-        self._session._logger.debug("Creating query with times : "+str(locals()))
+        self._session._logger.debug("Creating query with times : \
+            time_range="+str(time_range)+
+            "start_time="+str(start_time)+
+            "end_time="+str(end_time))
 
         #Declaring attributes
         self._time_range=str()
         self._start_time=str()
         self._end_time=str()
 
+        #Boolean will be set to false if the times makes sens
         timeIssue=True
         
         #init attributes
@@ -41,20 +51,27 @@ class QueryBase(ESMObject):
             timeIssue=False
 
         if start_time is not None and end_time is not None :
-            self.time_range='CUSTOM'
+            #self.time_range='CUSTOM' not necessary because 
+            #of the conditionnal time_range getter
             self._start_time=start_time
             self._end_time=end_time
             timeIssue=False
 
-        if timeIssue :
-            raise ESMException("The query must have valid time specifications. Please refer to documentation.")
+        if timeIssue : #Error if times are incorrect
+            raise ESMException("The query must have valid time specifications. \
+                Please refer to documentation.")
 
     def __str__(self):
         return str(self.__dict__)
 
     @property
     def time_range(self):
-        return self._time_range
+        """
+        Returns 'CUSTOM' if the start and end times are set.
+        """
+        return ('CUSTOM' if 
+        self.start_time is not None and self.end_time is not None
+        else self._time_range)
 
     @property
     def start_time(self):
@@ -68,7 +85,9 @@ class QueryBase(ESMObject):
     @time_range.setter
     def time_range(self, time_range):
         """
-        Set the time range of the query to the specified string value. Default : LAST_3_DAYS
+        Set the time range of the query to the specified string value.
+        Not required if start and end times are set.
+        #TODO better time comprenhention
         """
 
         if time_range in POSSIBLE_TIME_RANGE :
@@ -81,41 +100,35 @@ class QueryBase(ESMObject):
     @start_time.setter
     def start_time(self, start_time):
         """
-        Set the time start of the query. Time range must be CUSTOM for this to work.
+        Set the time start of the query.
+        #TODO better time comprenhention
         """
-        
-        if start_time is not None :
-            if self._time_range == 'CUSTOM':
-                self._start_time=start_time
-                
-            else:
-                raise ESMException("The time range must be 'CUSTOM' if you want to specify a custom start time")
-        else:
-            self._start_time=None
+        self._start_time=start_time
                 
     
     @end_time.setter
     def end_time(self, end_time):
         """
-        Set the time end of the query. Time range must be CUSTOM for this to work.
+        Set the time end of the query.
+        #TODO better time comprenhention
         """
-       
-        if end_time is not None :
-            if self._time_range == 'CUSTOM':
-                self._end_time=end_time
-                
-            else:
-                raise ESMException("The time range must be 'CUSTOM' if you want to specify a custom end time")
-        else :
-            self._end_time=None
+        self._end_time=end_time
+
                 
     @abstractproperty
     def filters(self):
-        raise ESMException("Not implemented in the base query")
+        """
+        Every query has filters
+        """
+        raise NotImplementedError("Not implemented in the base query")
 
     @filters.setter
     def filters(self, filters):
-        
+        """
+        Filters are represented with a list of tuple (field, values).
+        If a tuple is passed, it's added as the only filter
+        #TODO remove all filters is the filters arg is None ?
+        """
         if isinstance(filters, list):
             for f in filters :
                 self.add_filter(f)
@@ -131,11 +144,18 @@ class QueryBase(ESMObject):
        
     @abstractmethod
     def add_filter(self, filter):
-        raise ESMException("Not implemented in the base query")
+        """
+        Method that takes care of adding a filter to a query.
+        The filter can be a tuple.
+        """
+        raise NotImplementedError("Not implemented in the base query")
 
     @abstractmethod
     def execute(self):
-        raise ESMException("Not implemented in the base query")
+        """
+        Method that will trigger the execution of the query and return the results.
+        """
+        raise NotImplementedError("Not implemented in the base query")
 
 class TestingQuery(QueryBase):
 
@@ -156,6 +176,7 @@ class AlarmQuery(QueryBase):
         """
         filters : [(field, [values]), (field, [values])]
         field can be an EsmTriggeredAlarm or an EsmTriggeredAlarmEvent field
+        **args are passed to QueryBase object
         """
 
         super().__init__(**args)
@@ -340,207 +361,6 @@ class AlarmQuery(QueryBase):
 
         self._session._logger.info(str(len(alarms)) + " alarms matching your filter(s)")
         return alarms
-
-class Alarm(ESMObject):
-    """
-    Alarm object. 
-    Gives possibility to access alarm fields and related events.
-    Delete, Ack, or Unack alarm.
-    """
-
-    def __init__(self, **args):
-        
-        self.id = {"value" : 0}
-        self.summary = ''
-        self.assignee = ''
-        self.severity = 0
-        self.triggeredDate = ''
-        self.acknowledgedDate = ''
-        self.acknowledgedUsername = ''
-        self.alarmName = ''
-        self.conditionType = 0
-
-        self.__dict__.update(args)
-
-        self._detailed = None
-
-        super().__init__()
-
-    def _hasID(self):
-        try :
-            if self.id['value'] == 0 :
-                return False
-            else :
-                return True
-        
-        except KeyError :
-            return False
-
-
-    @property
-    def detailed(self):
-        if self._hasID() :
-            if self._detailed is None :
-                self._detailed = DetailedAlarm(self)
-            return self._detailed
-        else :
-            raise ESMException("Looks like this alarm doesn't have a valid ID. Cannot get the details.")
-
-    @property
-    def events(self):
-        return self.detailed.events
-
-    @property
-    def status(self):
-        return('acknowledged' if (
-            (self.acknowledgedDate is None or len(self.acknowledgedDate)>0) 
-            and 
-            (self.acknowledgedUsername is None or len(self.acknowledgedUsername)>0)
-            )
-            else 'unacknowledged')
-
-    def delele(self):
-        if self._hasID() :
-            self.esmRequest('delete_alarms', ids=[self.id['value']])
-        else :
-            raise ESMException("Looks like this alarm doesn't have a valid ID. Cannot delete.")
-        return
-    
-    def acknowledge(self):
-        if self._hasID() :
-            self.esmRequest('ack_alarms', ids=[self.id['value']])
-        else :
-            raise ESMException("Looks like this alarm doesn't have a valid ID. Cannot acknowledge.")
-        return
-
-    def unacknowledge(self):
-        if self._hasID() :
-            self.esmRequest('unack_alarms', ids=[self.id['value']])
-        else :
-            raise ESMException("Looks like this alarm doesn't have a valid ID. Cannot unacknowledge.")
-        return  
-
-class AlarmCollection(list):
-    """
-        Double inheritance doesn't seem to work as expected, need to call ESMSession() directly
-    """
-    def __init__(self, alarms):
-        super().__init__()
-        self+=alarms
-
-    def _ack(self, alarm):
-        return alarm.acknowledge()
-
-    def _unack(self, alarm):
-        return alarm.unacknowledge()
-
-    def _delete(self, alarm):
-        return alarm.delete()
-
-    def ack(self):
-        self.acknowledge()
-
-    def unack(self):
-        self.unacknowledge()
-
-    def acknowledge(self):
-        ESMSession()._logger.info("Ackowledging alarms...")
-        ESMSession()._executor.map(self._ack, self)
-
-    def unacknowledge(self):
-        ESMSession()._logger.info("Unackowledging alarms...")
-        ESMSession()._executor.map(self._unack, self)
-
-    def delete(self):
-        raise ESMException("Not implemented for security reasons.")
-        """
-        ESMSession()._logger.info("Unackowledging alarms...")
-        ESMSession()._executor.map(self._delete, self)
-        """
-
-    def show(self, add_columns=[], sortBy=None):
-        table = PrettyTable()
-        table.field_names=[f[0] for f in ALARM_FILTER_FIELDS]+['status']+[f[0] for f in ALARM_EVENT_FILTER_FIELDS]
-        for a in self :
-            table.add_row(
-                [a.__dict__[f[0]] for f in ALARM_FILTER_FIELDS]+[a.status]+
-                [ (a.events[0][f[0]] if len(a.events)>0 else 'No event') for f in ALARM_EVENT_FILTER_FIELDS])
-
-        print(table.get_string(fields=ALARM_DEFAULT_FIELDS+add_columns, sortby=sortBy))
-
-    def json(self):
-        return None
-
-class DetailedAlarm(Alarm):
-    """
-    Alarm details object. Based on EsmTriggeredAlarmDetail
-    """
-    def __init__(self, alarm):
-
-        if not alarm._hasID() :
-            raise ESMException("Looks like this alarm doesn't have a valid ID. Cannot init DetailledAlarm.")
-        
-        super().__init__(id=alarm.id)
-
-        """
-        self.id = {"value" : 0} #duplicate
-        self.summary = '' #duplicate
-        self.assignee = '' #duplicate
-        self.severity = 0 #duplicate
-        self.triggeredDate  = '' #duplicate
-        self.acknowledgedDate  = ''#duplicate
-        self.acknowledgedUsername  = ''#duplicate
-        self.alarmName  = ''#duplicate
-        self.conditionType  = 0 #duplicate
-
-        self.filters  = ''
-        self.queryId = 0
-        self.alretRateMin = 0
-        self.alertRateCount = 0
-        self.percentAbove = 0
-        self.percentBelow = 0
-        self.offsetMinutes = 0
-        self.timeFilter  = ''
-        self.maximumConditionTriggerFrequency = 0
-        self.useWatchlist = ''
-        self.matchField = ''
-        self.matchValue = ''
-        self.healthMonStatus = ''
-        self.assigneeId = 0
-        self.escalatedDate = ''
-        self.caseId = 0
-        self.caseName = ''
-        self.iocName = 0
-        self.iocId = 0
-        self.description = ''
-        self.actions = ''
-        """
-
-        self._events=list()
-
-        resp = self.esmRequest('get_alarm_details', id=alarm.id)
-
-        self.__dict__.update(resp)
-
-        self.id = alarm.id
-
-        self._events = resp['events']
-
-    @property
-    def detailed(self):
-        return self
-
-    @property
-    def events(self):
-        return self._events
-
-class Event(ESMObject):
-    """ Based on EsmTriggeredAlarmEvent """
-    def __init__(self, **args):
-        self.__dict__.update(**args)
-
-    def addNote(self, string):
-        pass
 
 class EventQuery(QueryBase):
     """
@@ -761,19 +581,6 @@ class EventQuery(QueryBase):
                 event.update({columns[i]['name']:row['values'][i]})
             events.append(Event(**event))
         return events
-
-class EventCollection(list):
-    def __init__(self, events):
-        super().__init__()
-        self+=events
-
-    def show(self, add_columns=[], sortBy=None):
-        table = PrettyTable()
-        table.field_names=[f[0] for f in ALARM_EVENT_FILTER_FIELDS]
-        for a in self :
-            pass #TODO
-
-        print(table.get_string(fields=ALARM_DEFAULT_FIELDS+add_columns, sortby=sortBy))
 
 class QueryFilter(ESMObject):
 

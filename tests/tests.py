@@ -29,10 +29,6 @@ class Tests(unittest.TestCase):
         with self.assertRaisesRegex(msiem.exceptions.ESMException,"The time range must be in"):
             query.time_range='impossible time range'
         
-        query = msiem.query.TestingQuery(time_range='LAST_MINUTE')
-        with self.assertRaisesRegex(msiem.exceptions.ESMException,"The time range must be 'CUSTOM' if you want to specify a custom start time"):
-            query.start_time='1999-01-01'
-        
         with self.assertRaisesRegex(msiem.exceptions.ESMException,"Not implemented"):
             msiem.query.TestingQuery(
                 time_range='CUSTOM',
