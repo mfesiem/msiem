@@ -169,13 +169,12 @@ msiem elm
 
 def parseArgs():
     parser = argparse.ArgumentParser(description='McAfee SIEM Command Line Interface and Python API',
-                usage='Use "msiem --help" for more information',
-                formatter_class=argparse.RawTextHelpFormatter)
+                usage='Use "msiem <command> --help" for more information.')
 
     parser.add_argument('--version', help="Show version",action="store_true")
     parser.add_argument('-v', '--verbose', help="Increase output verbosity",action="store_true")
 
-    commands = parser.add_subparsers()
+    commands = parser.add_subparsers(dest='command')
 
     config = commands.add_parser('config')
     config.set_defaults(func=config)
@@ -199,8 +198,8 @@ def parseArgs():
     alarm.add_argument('--summary', metavar="sumary", help="Alarm summary filter")
     alarm.add_argument('--assignee', metavar="assignee", help="Alarm assignee filter")
     alarm.add_argument('--severity', metavar="severity", help="Alarm severity filter")
-    alarm.add_argument('--trigdate', metavar="trigdate", help="Alarm trigdate filter")
-    alarm.add_argument('--ackdate', metavar="ackdate", help="Alarm ackdate filter")
+    alarm.add_argument('--trigdate', metavar="trigdate", help="Alarm trigdate filter. Not working, use --time_range")
+    alarm.add_argument('--ackdate', metavar="ackdate", help="Alarm ackdate filter. Not working.")
     alarm.add_argument('--ackuser', metavar="ackuser", help="Alarm ackuser filter")
     alarm.add_argument('--name', metavar="name", help="Alarm name filter")
 
@@ -256,10 +255,29 @@ def alarms(args):
 
 def main():
     args = parseArgs()
+    print("""McAfee SIEM Command Line Interface
+                _                
+  _ __ ___  ___(_) ___ _ __ ___  
+ | '_ ` _ \/ __| |/ _ | '_ ` _ \ 
+ | | | | | \__ | |  __| | | | | |
+ |_| |_| |_|___|_|\___|_| |_| |_|
+    """)
 
-    if hasattr(args, 'func') :
-        args.func(args)
-    
+    if args.command == 'config' :
+        config(args)
+    elif args.command == 'alarms' :
+        alarms(args)
+
+
+        """
+        #Needs to ignore exception when we call 'msiem command' with no other attributes
+        try :
+            args.func(args)
+        except TypeError as err :
+            if "'ArgumentParser' object is not callable" in str(err):
+                print("Please refer to documentation.")
+            else:
+                raise"""
 
 if __name__ == "__main__":
     main()

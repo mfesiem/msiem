@@ -6,7 +6,7 @@ Based on the work of andywalen : https://github.com/andywalden
 #### Installation
 ```
 pip install msiem
-msiem config --set auth
+msiem config --set
 python3 setup.py test
 ```
 
