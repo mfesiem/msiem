@@ -10,7 +10,7 @@ from abc import abstractmethod, abstractproperty
 from prettytable import PrettyTable
 from .session import ESMObject, ESMSession
 from .exceptions import ESMException
-from .utils import getTimes, regexMatch
+from .utils import getTimes, regexMatch, format_esm_time
 from .constants import (POSSIBLE_TIME_RANGE,
     POSSIBLE_FIELD_TYPES, 
     POSSIBLE_OPERATORS, 
@@ -20,10 +20,11 @@ from .constants import (POSSIBLE_TIME_RANGE,
     DEFAULTS_EVENT_FIELDS,
     ALARM_FILTER_FIELDS,
     ALARM_EVENT_FILTER_FIELDS,
-    ALARM_DEFAULT_FIELDS)
+    ALARM_DEFAULT_FIELDS,
+    FIELDS_TABLES)
 
 class QueryBase(ESMObject):
-    def __init__(self, time_range=None, start_time=None, end_time=None):
+    def __init__(self, time_range=None, start_time=None, end_time=None, auto_offset=False):
         super().__init__()
 
         self._session._logger.debug("Creating query with times : "+str(locals()))
@@ -48,6 +49,8 @@ class QueryBase(ESMObject):
 
         if timeIssue :
             raise ESMException("The query must have valid time specifications. Please refer to documentation.")
+
+        self.auto_offset = auto_offset
 
     def __str__(self):
         return str(self.__dict__)
@@ -292,8 +295,9 @@ class AlarmQuery(QueryBase):
             alarm = Alarm(**alarm_data)
             alarms.append(alarm)
         
-        if len(alarms) == 5000:
-            self._session._logger.warning("The maximum amount of alarms was retreived from the SIEM, some alarms are ignored refine your time range or status to avoid this.")
+        if len(alarms) == self.page_size:
+            #TODO automatically get next page if auto_offset is True
+            self._session._logger.warning("The maximum amount of alarms was retreived from the SIEM, some alarms are ignored refine your time range or status to avoid this. auto_offset is not yet supported for AlarmQuery !")
 
         return AlarmCollection(self._filter(alarms))
 
@@ -542,6 +546,27 @@ class Event(ESMObject):
     def addNote(self, string):
         pass
 
+    def __str__(self):
+        return repr(self.__dict__)
+
+    def __getattribute__(self, name):
+        """
+        Automatically adding the table name of the field
+        """
+        for table in FIELDS_TABLES :
+            try :
+                return object.__getattribute__(self, table+'.'+name)
+            except AttributeError :
+                pass
+
+        try :
+            return object.__getattribute__(self, name)
+        except AttributeError :
+            if name in DEFAULTS_EVENT_FIELDS :
+                return None
+            else:
+                raise
+
 class EventQuery(QueryBase):
     """
     Interface to qryExecuteDetail?type=EVENT method.
@@ -728,7 +753,18 @@ class EventQuery(QueryBase):
         if self._waitFor(self._query['resultID']):
             self._executed = True
 
-        return (EventCollection(self._getEvents()))
+        part_of_events=EventCollection(self._getEvents())
+
+        if len(part_of_events) == self.limit :
+            if self.auto_offset :
+                self._session._logger.info("Got the maximum number of events, auomatically working arround this...")
+                self.start_time = format_esm_time(part_of_events[-1].LastTime)
+
+                part_of_events+=self.execute()
+            else:
+                self._session._logger.warning("Got the maximum number of events, auto_offset is false, turn it on if you want to get all events")
+
+        return (part_of_events)
 
     def _waitFor(self, resultID):
         self._session._logger.debug("Waiting for the query to be executed on the SIEM...")
@@ -769,11 +805,13 @@ class EventCollection(list):
 
     def show(self, add_columns=[], sortBy=None):
         table = PrettyTable()
-        table.field_names=[f[0] for f in ALARM_EVENT_FILTER_FIELDS]
-        for a in self :
-            pass #TODO
+        table.field_names=DEFAULTS_EVENT_FIELDS
 
-        print(table.get_string(fields=ALARM_DEFAULT_FIELDS+add_columns, sortby=sortBy))
+        for event in self :
+            #print(event)
+            table.add_row([event.__getattribute__(atr) for atr in DEFAULTS_EVENT_FIELDS])
+
+        print(table.get_string(fields=DEFAULTS_EVENT_FIELDS+add_columns, sortby=sortBy))
 
 class QueryFilter(ESMObject):
 

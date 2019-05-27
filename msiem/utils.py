@@ -174,3 +174,10 @@ def regexMatch(regex, string):
         return True
     else:
         return False
+
+def format_esm_time(esm_time):
+    _esm_out_time_fmt = '%m/%d/%Y %H:%M:%S'
+    _esm_in_time_fmt = '%Y-%m-%dT%H:%M:%S.000Z'
+    if isinstance(esm_time, str):
+        esm_time = datetime.strptime(esm_time, _esm_out_time_fmt)
+    return datetime.strftime(esm_time, _esm_in_time_fmt)

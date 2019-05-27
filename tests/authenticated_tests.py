@@ -84,30 +84,29 @@ class QueryTests(unittest.TestCase):
 
         query = msiem.query.EventQuery(
             filters=[('DstIP', ['10.0.0.0/8'])],
-            limit=1,
+            limit=50,
             offset=0,
             time_range='LAST_30_MINUTES',
             compute_time_range=False
         )
-
-        events = query.execute()
-        print("Got "+str(len(events))+" events !")
+        query.execute().show()
 
         query = msiem.query.EventQuery(
-            filters=[('DstIP', ['10.0.0.0/8'])],
-            limit=1,
-            offset=100,
-            time_range='LAST_30_MINUTES',
-            compute_time_range=False
+            #time_range='LAST_3_DAYS',
+            fields=['SrcIP', 'DstIP', 'SigID'],
+            filters=[msiem.query.GroupFilter(
+                msiem.query.FieldFilter('DstIP', ['10.0.0.0/8']),
+                msiem.query.FieldFilter('SrcIP', ['10.0.0.0/8']),
+                logic='OR'
+                )],
+            time_range='LAST_MINUTE',
+            auto_offset=True,
+            limit=2
         )
-
-        events2 = query.execute()
-        print("Got "+str(len(events2))+" events !")
-
-        print(events[0])
-        print(events2[0])
-
-        self.assertEqual(events[0].__dict__, events2[0].__dict__, 'This test will fail if the offset parameter gets fixed on the SIEM side')
+        events = query.execute()
+        events.show()
+        for e in events :
+            self.assertRegex(e.SrcIP,'^10.','Auto offset filtering is problematic')
 
     def test_TimeRange(self):
 
@@ -196,3 +195,4 @@ class QueryTests(unittest.TestCase):
             self.assertRegex(str(alarm.severity), '80|85|90|95|100', 'Filtering alarms is not working')
             self.assertRegex(str(alarm.events[0]), 'HTTP', 'Filtering alarms is not working')
             self.assertRegex(str(alarm.events[0]), '10.165', 'Filtering alarms is not working')
+
