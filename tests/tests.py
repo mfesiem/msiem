@@ -9,7 +9,7 @@ import time
 import subprocess, shlex
 import msiem
 import msiem.query
-from msiem.utils import getTimes
+from msiem.utils import getTimes, divideTimes
 
 class Tests(unittest.TestCase):
 
@@ -33,12 +33,12 @@ class Tests(unittest.TestCase):
         with self.assertRaisesRegex(msiem.exceptions.ESMException,"The time range must be 'CUSTOM' if you want to specify a custom start time"):
             query.start_time='1999-01-01'
         
-        with self.assertRaisesRegex(msiem.exceptions.ESMException,"Not implemented"):
-            msiem.query.TestingQuery(
-                time_range='CUSTOM',
-                start_time='2019-01-01T14:32',
-                end_time='2019-02-01T12:00'
-            ).execute()
+        #with self.assertRaisesRegex(NotImplementedError,"Not implemented"):
+        msiem.query.TestingQuery(
+            time_range='CUSTOM',
+            start_time='2019-01-01T14:32',
+            end_time='2019-02-01T12:00'
+        ).execute()
 
     def test_AlarmQuery(self):
         
@@ -248,6 +248,12 @@ class Tests(unittest.TestCase):
         msg=self.command("msiem alarms -t LAST_24_HOURS --filters 'srcip=10.0' 'dstip=10.0'")
         self.assertRegex(msg, '10.0')
         """
+
+    def test_utils(self):
+        
+        #print(divideTimes('2019-01-01T00:00:00','2021-05-29T16:00:00','2019-01-05T14:00:00'))
+
+        pass
 
 """
 if __name__ == '__main__':

@@ -1,4 +1,3 @@
-
 # -*- coding: utf-8 -*-
 """
     msiem utils
@@ -12,6 +11,7 @@ import logging
 from .constants import POSSIBLE_TIME_RANGE
 from .exceptions import ESMException
 from datetime import datetime, timedelta
+import dateutil.parser
 
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 
@@ -168,6 +168,38 @@ def getTimes(timeFrame):
         pass
     elif t is 'PREVIOUS_YEAR':
         pass"""
+
+def divideTimes(firstTime, lastTime, last1stSlotTime=0, nbSlots=0):
+    """"
+        Return list of tuple 
+    """
+
+    #parse the dates
+    t1=dateutil.parser.parse(firstTime) if not isinstance(firstTime, datetime) else firstTime
+    t2=dateutil.parser.parse(lastTime) if not isinstance(lastTime, datetime) else lastTime
+    
+    delta=t2-t1
+
+    if nbSlots==0 :
+
+        if last1stSlotTime==0 :
+            raise ESMException('Either last1stSlotTime or nbSlots must be specified')
+        else :
+            tSlot=dateutil.parser.parse(last1stSlotTime)
+            div=tSlot-t1
+            nbSlots=int(delta.total_seconds()/div.total_seconds())+2
+
+    timeSlot=timedelta(seconds=delta.total_seconds()/nbSlots)
+
+    #print(locals())
+
+    times=list()
+
+    for i in range(nbSlots):
+        times.append( (t1, t1+timeSlot) )
+        t1+=timeSlot
+
+    return(times)
 
 def regexMatch(regex, string):
     if re.search(regex, string):

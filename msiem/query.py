@@ -4,13 +4,15 @@
 """
 import json
 import time
+import copy
 import concurrent.futures
+import datetime
 from tqdm import tqdm
 from abc import abstractmethod, abstractproperty
 from prettytable import PrettyTable
 from .session import ESMObject, ESMSession
 from .exceptions import ESMException
-from .utils import getTimes, regexMatch, format_esm_time
+from .utils import getTimes, regexMatch, format_esm_time, divideTimes
 from .constants import (POSSIBLE_TIME_RANGE,
     POSSIBLE_FIELD_TYPES, 
     POSSIBLE_OPERATORS, 
@@ -24,7 +26,7 @@ from .constants import (POSSIBLE_TIME_RANGE,
     FIELDS_TABLES)
 
 class QueryBase(ESMObject):
-    def __init__(self, time_range=None, start_time=None, end_time=None, auto_offset=False):
+    def __init__(self, time_range=None, start_time=None, end_time=None, auto_offset=False, sub_query=0):
         super().__init__()
 
         self._session._logger.debug("Creating query with times : "+str(locals()))
@@ -52,8 +54,10 @@ class QueryBase(ESMObject):
 
         self.auto_offset = auto_offset
 
+        self.sub_query=sub_query
+
     def __str__(self):
-        return str(self.__dict__)
+        return str(repr(self.__dict__))
 
     @property
     def time_range(self):
@@ -114,7 +118,7 @@ class QueryBase(ESMObject):
                 
     @abstractproperty
     def filters(self):
-        raise ESMException("Not implemented in the base query")
+        pass
 
     @filters.setter
     def filters(self, filters):
@@ -127,30 +131,67 @@ class QueryBase(ESMObject):
             self.add_filter(filters)
 
         elif filters is None :
-            pass
+            self.clear_filters()
         
         else :
             raise ESMException("Illegal type for the filter object, it must be a list of a tuple.")
        
     @abstractmethod
     def add_filter(self, filter):
-        raise ESMException("Not implemented in the base query")
-
+        pass
+    
     @abstractmethod
-    def execute(self):
-        raise ESMException("Not implemented in the base query")
+    def clear_filters(self):
+        pass
+    
+    @abstractmethod
+    def _execute(self) -> (list, bool, str):
+        pass
+
+    @staticmethod
+    def _run_execute(query):
+        return(query.execute())
+
+    def execute(self) -> list:
+        items, completed, last_item_time = self._execute() 
+
+        if not completed and self.sub_query < 1:
+            self._session._logger.info("The query couldn't be executed in one go, separating it in sub-querties.")
+            times=divideTimes(self.start_time, self.end_time, last_item_time)
+            sub_queries=list()
+            for time in times :
+                qry = copy.copy(self)
+                qry.start_time=time[0]
+                qry.end_time=time[1]
+                qry.sub_query+=1
+                sub_queries.append(qry)
+
+            [print(sub_query) for sub_query in sub_queries]
+
+            results = list(tqdm(self._session._executor.map(self._run_execute, sub_queries), total=len(sub_queries), ascii=True))
+
+            return([item for sublist in results for item in sublist])
+            
+        else :
+            return items
 
 class TestingQuery(QueryBase):
 
+    def __str__(self):
+        return str(repr(self.__dict__))
+
     @property
     def filters(self):
-        raise ESMException("Not implemented in the test query")
+        raise NotImplementedError("Not implemented in the test query")
     
     def add_filter(self, filter):
-        raise ESMException("Not implemented in the test query")
+        raise NotImplementedError("Not implemented in the test query")
     
-    def execute(self):
-        raise ESMException("Not implemented in the test query")
+    def _execute(self):
+        return ( ( [1,2,3,4], False, str(divideTimes(self.start_time, self.end_time, nbSlots=10)[0][1]) ) )
+
+    def clear_filters(self):
+        raise NotImplementedError("Not implemented in the test query")
 
 class AlarmQuery(QueryBase):
 
@@ -260,10 +301,14 @@ class AlarmQuery(QueryBase):
         if not added :
             raise ESMException("Illegal filter field value : "+afilter[0]+". The filter field must be in :"+str(ALARM_FILTER_FIELDS + ALARM_EVENT_FILTER_FIELDS))
 
-    def execute(self):
+    def clear_filters(self):
+        self._alarm_filters = list(tuple())
+        self._event_filters = list(tuple())
+
+    def _execute(self):
         """"
         Execute the query.
-        Returns a list of Alarms.
+        Returns a list of Alarms, query status, and last alarm time of the list.
         """
 
         resp=None
@@ -297,9 +342,10 @@ class AlarmQuery(QueryBase):
         
         if len(alarms) == self.page_size:
             #TODO automatically get next page if auto_offset is True
+            #Something like alarms += AlarmQuery(**args, page_number=self.page_number+1).execute() maybe
             self._session._logger.warning("The maximum amount of alarms was retreived from the SIEM, some alarms are ignored refine your time range or status to avoid this. auto_offset is not yet supported for AlarmQuery !")
 
-        return AlarmCollection(self._filter(alarms))
+        return ( (AlarmCollection(self._filter(alarms)), True, alarms[-1].triggeredDate) )
 
     def _alarm_match(self, alarm):
         match=True
@@ -659,16 +705,17 @@ class EventQuery(QueryBase):
             self._order[0]['direction']=order[0]
             self._order[0]['field']['name']=order[1]
 
+    """
     @filters.setter
     def filters(self, filters):
-        """
+        ""
             Uses BaseQuery.filter base implementation but adds a default filter when None
-        """
+        ""
         if filters is None :
             self.filters = [FieldFilter(name='AvgSeverity', operator='GREATER_THAN' , values=[1])]
         else :
             super(self.__class__, self.__class__).filters.__set__(self, filters)
-            #https://bugs.python.org/issue14965
+            #https://bugs.python.org/issue14965"""
             
     def add_filter(self, fil):
         if type(fil) is tuple :
@@ -679,6 +726,10 @@ class EventQuery(QueryBase):
         
         else :
             raise ESMException("Sorry the filters must be either a tuple(fiels, [values]) or a QueryFilter sub class.")
+
+    def clear_filters(self):
+        self.filters = [FieldFilter(name='AvgSeverity', operator='GREATER_THAN' , values=[1])]
+
 
     @fields.setter
     def fields(self, fields):
@@ -716,10 +767,10 @@ class EventQuery(QueryBase):
             self._time_range=time_range
   
 
-    def execute(self):
+    def _execute(self):
         """"
             Execute the query.
-            Returns a list of Events.
+            Returns a list of Events, the status of the query and the last event time in the list.
         """
 
         if self.time_range is 'CUSTOM' :
@@ -755,6 +806,7 @@ class EventQuery(QueryBase):
 
         part_of_events=EventCollection(self._getEvents())
 
+        """
         if len(part_of_events) == self.limit :
             if self.auto_offset :
                 self._session._logger.info("Got the maximum number of events, auomatically working arround this...")
@@ -763,8 +815,10 @@ class EventQuery(QueryBase):
                 part_of_events+=self.execute()
             else:
                 self._session._logger.warning("Got the maximum number of events, auto_offset is false, turn it on if you want to get all events")
-
-        return (part_of_events)
+        """
+        return (( part_of_events, 
+                not (len(part_of_events) == self.limit),
+                part_of_events[-1].lastTime ))
 
     def _waitFor(self, resultID):
         self._session._logger.debug("Waiting for the query to be executed on the SIEM...")
@@ -834,7 +888,7 @@ class QueryFilter(ESMObject):
 
     @abstractmethod
     def configDict(self):
-        raise ESMException("Not implemented in the base filter")
+        pass
 
 class GroupFilter(QueryFilter):
     """

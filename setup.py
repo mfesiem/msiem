@@ -21,7 +21,7 @@ setup(
         'console_scripts': ['msiem=msiem.command:main'],
     },
     install_requires=[
-          'requests','tqdm','PTable'
+          'requests','tqdm','PTable','python-dateutil'
     ],
     tests_require=[
           'pylint',

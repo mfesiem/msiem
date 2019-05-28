@@ -255,12 +255,15 @@ def alarms(args):
 
 def main():
     args = parseArgs()
-    print("""McAfee SIEM Command Line Interface
+    print("""
                 _                
   _ __ ___  ___(_) ___ _ __ ___  
  | '_ ` _ \/ __| |/ _ | '_ ` _ \ 
  | | | | | \__ | |  __| | | | | |
  |_| |_| |_|___|_|\___|_| |_| |_|
+     
+ McAfee SIEM Command Line Interface
+
     """)
 
     if args.command == 'config' :
