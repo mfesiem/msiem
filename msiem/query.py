@@ -12,7 +12,7 @@ from abc import abstractmethod, abstractproperty
 from prettytable import PrettyTable
 from .session import ESMObject, ESMSession
 from .exceptions import ESMException
-from .utils import getTimes, regexMatch, format_esm_time, divideTimes
+from .utils import getTimes, regexMatch, format_esm_time, divide_times
 from .constants import (POSSIBLE_TIME_RANGE,
     POSSIBLE_FIELD_TYPES, 
     POSSIBLE_OPERATORS, 
@@ -26,7 +26,7 @@ from .constants import (POSSIBLE_TIME_RANGE,
     FIELDS_TABLES)
 
 class QueryBase(ESMObject):
-    def __init__(self, time_range=None, start_time=None, end_time=None, auto_offset=False, sub_query=0):
+    def __init__(self, time_range=None, start_time=None, end_time=None, sub_query=0):
         super().__init__()
 
         self._session._logger.debug("Creating query with times : "+str(locals()))
@@ -51,8 +51,6 @@ class QueryBase(ESMObject):
 
         if timeIssue :
             raise ESMException("The query must have valid time specifications. Please refer to documentation.")
-
-        self.auto_offset = auto_offset
 
         self.sub_query=sub_query
 
@@ -153,24 +151,37 @@ class QueryBase(ESMObject):
         return(query.execute())
 
     def execute(self) -> list:
+        #TODO fix the issue when sub_query > 1 --> the executor get filled of sub divided queries that can't be executed cause no space left on the executor
+        #may be arrange dymanically the executor size ?
+        #self._session._logger.info("Executing the query...")
+        #having a better slots comprhention with last_item_time
+        
         items, completed, last_item_time = self._execute() 
 
-        if not completed and self.sub_query < 1:
-            self._session._logger.info("The query couldn't be executed in one go, separating it in sub-querties.")
-            times=divideTimes(self.start_time, self.end_time, last_item_time)
-            sub_queries=list()
-            for time in times :
-                qry = copy.copy(self)
-                qry.start_time=time[0]
-                qry.end_time=time[1]
-                qry.sub_query+=1
-                sub_queries.append(qry)
+        if not completed :
+            if self.sub_query > 0 :
+                #self._session._logger.info("The query couldn't be executed in one request, separating it in sub-queries...")
+                
+                times=divide_times(time_range=self.time_range, first=self.start_time, last=self.end_time, slots=5)
+                sub_queries=list()
 
-            [print(sub_query) for sub_query in sub_queries]
+                for time in times :
+                    qry = copy.copy(self)
+                    qry.time_range='CUSTOM'
+                    qry.start_time=time[0].isoformat()
+                    qry.end_time=time[1].isoformat()
+                    qry.sub_query-=1
+                    sub_queries.append(qry)
 
-            results = list(tqdm(self._session._executor.map(self._run_execute, sub_queries), total=len(sub_queries), ascii=True))
+                [self._session._logger.debug(sub_query) for sub_query in sub_queries]
 
-            return([item for sublist in results for item in sublist])
+                results = list(tqdm(self._session._executor.map(self._run_execute, sub_queries), total=len(sub_queries), ascii=True))
+
+                return([item for sublist in results for item in sublist])
+            
+            else :
+                #self._session._logger.info("The query couldn't be fully executed.")
+                return items
             
         else :
             return items
@@ -188,7 +199,7 @@ class TestingQuery(QueryBase):
         raise NotImplementedError("Not implemented in the test query")
     
     def _execute(self):
-        return ( ( [1,2,3,4], False, str(divideTimes(self.start_time, self.end_time, nbSlots=10)[0][1]) ) )
+        return ( ( [1,2,3,4], False, str(divide_times(self.start_time, self.end_time, slots=10)[0][1]) ) )
 
     def clear_filters(self):
         raise NotImplementedError("Not implemented in the test query")
@@ -346,6 +357,9 @@ class AlarmQuery(QueryBase):
             self._session._logger.warning("The maximum amount of alarms was retreived from the SIEM, some alarms are ignored refine your time range or status to avoid this. auto_offset is not yet supported for AlarmQuery !")
 
         return ( (AlarmCollection(self._filter(alarms)), True, alarms[-1].triggeredDate) )
+
+    def execute(self):
+        return AlarmCollection(super().execute())
 
     def _alarm_match(self, alarm):
         match=True
@@ -609,7 +623,7 @@ class Event(ESMObject):
             return object.__getattribute__(self, name)
         except AttributeError :
             if name in DEFAULTS_EVENT_FIELDS :
-                return None
+                return 'Data unavailable'
             else:
                 raise
 
@@ -658,7 +672,8 @@ class EventQuery(QueryBase):
         self.fields = DEFAULTS_EVENT_FIELDS
         self.fields = fields
 
-        self.filters = filters
+        super(self.__class__, self.__class__).filters.__set__(self, filters)
+        #https://bugs.python.org/issue14965
 
         self.order = order
         
@@ -817,8 +832,8 @@ class EventQuery(QueryBase):
                 self._session._logger.warning("Got the maximum number of events, auto_offset is false, turn it on if you want to get all events")
         """
         return (( part_of_events, 
-                not (len(part_of_events) == self.limit),
-                part_of_events[-1].lastTime ))
+                len(part_of_events) < self.limit,
+                part_of_events[-1].LastTime if len(part_of_events)>0 else None ))
 
     def _waitFor(self, resultID):
         self._session._logger.debug("Waiting for the query to be executed on the SIEM...")
@@ -851,6 +866,9 @@ class EventQuery(QueryBase):
                 event.update({columns[i]['name']:row['values'][i]})
             events.append(Event(**event))
         return events
+
+    def execute(self):
+        return EventCollection(super().execute())
 
 class EventCollection(list):
     def __init__(self, events):

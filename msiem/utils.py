@@ -169,35 +169,49 @@ def getTimes(timeFrame):
     elif t is 'PREVIOUS_YEAR':
         pass"""
 
-def divideTimes(firstTime, lastTime, last1stSlotTime=0, nbSlots=0):
+def divide_times(time_range=None, first=None, last=None, time=0, slots=0, delta=0, min_slots=0):
     """"
+        Divide the time range based on another time, a delta or on a number of slots
         Return list of tuple 
     """
 
+    #print("Calling divide_times with :"+str(locals()))
+
+    if time_range is not None and time_range is not 'CUSTOM':
+        first, last = getTimes(time_range)
+
     #parse the dates
-    t1=dateutil.parser.parse(firstTime) if not isinstance(firstTime, datetime) else firstTime
-    t2=dateutil.parser.parse(lastTime) if not isinstance(lastTime, datetime) else lastTime
+    t1=dateutil.parser.parse(first) if not isinstance(first, datetime) else first
+    t2=dateutil.parser.parse(last) if not isinstance(last, datetime) else last
     
-    delta=t2-t1
+    duration=t2-t1
 
-    if nbSlots==0 :
+    if slots==0 :
+        if time==0 :
+            if delta==0 :
+                raise AttributeError('Either time, slots or delta must be specified')
+            elif(isinstance(delta, timedelta)):
+                raise NotImplementedError('todo')
+            else:
+                raise AttributeError('delta Must be timedelta object')
 
-        if last1stSlotTime==0 :
-            raise ESMException('Either last1stSlotTime or nbSlots must be specified')
         else :
-            tSlot=dateutil.parser.parse(last1stSlotTime)
+            tSlot=dateutil.parser.parse(time)
             div=tSlot-t1
-            nbSlots=int(delta.total_seconds()/div.total_seconds())+2
+            slots=int(duration.total_seconds()/div.total_seconds())
 
-    timeSlot=timedelta(seconds=delta.total_seconds()/nbSlots)
+    slots+=min_slots
+    timeSlot=timedelta(seconds=duration.total_seconds()/slots)
 
     #print(locals())
 
     times=list()
 
-    for i in range(nbSlots):
+    for i in range(slots):
         times.append( (t1, t1+timeSlot) )
         t1+=timeSlot
+
+    #print("Returned times are :"+str(times))
 
     return(times)
 
