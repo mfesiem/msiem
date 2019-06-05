@@ -25,6 +25,7 @@ DEFAULT_CONFIG_FILE='''
     [general]
     verbose=no
     ssl_verify=no
+    max_workers=15
 
     [esm]
     host=

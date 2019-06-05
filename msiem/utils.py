@@ -181,9 +181,9 @@ def divideTimes(firstTime, lastTime, last1stSlotTime=0, nbSlots=0):
     delta=t2-t1
 
     if nbSlots==0 :
-
         if last1stSlotTime==0 :
-            raise ESMException('Either last1stSlotTime or nbSlots must be specified')
+            raise AttributeError('Either last1stSlotTime or nbSlots must be specified')
+
         else :
             tSlot=dateutil.parser.parse(last1stSlotTime)
             div=tSlot-t1

@@ -94,7 +94,7 @@ class ESMConfig(ConfigParser):
             raise Exception("Couldn't write config file, no specified path.")
 
     @staticmethod
-    def _find_ini_location():
+    def _find_ini_location() -> object:
         """
         Attempt to locate the conf.ini file 
         """
