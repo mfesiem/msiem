@@ -9,7 +9,7 @@ import time
 import subprocess, shlex
 import msiem
 import msiem.query
-from msiem.utils import getTimes, divideTimes
+from msiem.utils import getTimes, divide_times
 
 class Tests(unittest.TestCase):
 
@@ -251,7 +251,7 @@ class Tests(unittest.TestCase):
 
     def test_utils(self):
         
-        #print(divideTimes('2019-01-01T00:00:00','2021-05-29T16:00:00','2019-01-05T14:00:00'))
+        print(divide_times('2019-01-01T00:00:00','2019-05-29T16:00:00','2019-01-05T14:00:00'))
 
         pass
 

@@ -83,25 +83,27 @@ class QueryTests(unittest.TestCase):
         )
 
         query = msiem.query.EventQuery(
-            filters=[('DstIP', ['10.0.0.0/8'])],
-            limit=50,
-            offset=0,
-            time_range='LAST_30_MINUTES',
-            compute_time_range=False
-        )
-        query.execute().show()
-
-        query = msiem.query.EventQuery(
-            #time_range='LAST_3_DAYS',
             fields=['SrcIP', 'DstIP', 'SigID'],
             filters=[msiem.query.GroupFilter(
                 msiem.query.FieldFilter('DstIP', ['10.0.0.0/8']),
                 msiem.query.FieldFilter('SrcIP', ['10.0.0.0/8']),
-                logic='OR'
+                logic='AND'
                 )],
-            time_range='LAST_MINUTE',
-            auto_offset=True,
-            limit=2
+            time_range='LAST_10_MINUTES',
+            limit=100
+        )
+        query.execute().show()
+
+        query = msiem.query.EventQuery(
+            fields=['SrcIP', 'DstIP', 'SigID', 'LastTime'],
+            filters=[msiem.query.GroupFilter(
+                msiem.query.FieldFilter('DstIP', ['10.0.0.0/8']),
+                msiem.query.FieldFilter('SrcIP', ['10.0.0.0/8']),
+                logic='AND'
+                )],
+            time_range='LAST_10_MINUTES',
+            limit=100,
+            sub_query=1
         )
         events = query.execute()
         events.show()
