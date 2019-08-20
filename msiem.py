@@ -160,6 +160,7 @@ import argparse
 import msiempy
 import msiempy.event
 import msiempy.alarm
+import msiempy.device
 
 class Formatter( argparse.ArgumentDefaultsHelpFormatter, argparse.RawDescriptionHelpFormatter): pass
 
@@ -174,8 +175,8 @@ def parse_args():
 
     config = commands.add_parser('config', formatter_class=Formatter)
     config.set_defaults(func=config)
-    config.add_argument('--list', help="List configuration fields", action="store_true")
-    config.add_argument('--set', help="Will inveractively prompt for configuration settings", action="store_true")
+    config.add_argument('--print', help="Print configuration fields", action="store_true")
+    config.add_argument('--set', metavar='section', help="Will inveractively prompt for specified configuration section")
 
     alarm = commands.add_parser('alarms', formatter_class=Formatter, epilog=alarms.__doc__)
     alarm.set_defaults(func=alarms)
@@ -206,6 +207,16 @@ def parse_args():
     alarm.add_argument('--no_events', help='Do not load unecessary event data in order to filter', action="store_true")
     alarm.add_argument('--query_events', help='Use the query API query module to retreive events, much more effcient', action="store_true")
 
+    esm_parser = commands.add_parser('esm', formatter_class=Formatter)
+    esm_parser.set_defaults(func=esm)
+    esm_parser.add_argument('--version', help='Show ESM version', action="store_true")
+    esm_parser.add_argument('--time', help='time (GMT)', action="store_true")
+    esm_parser.add_argument('--disks', help='disk status', action="store_true")
+    esm_parser.add_argument('--ram', help='ram status', action="store_true")
+    esm_parser.add_argument('--callhome', help='True/False if callhome is active/not active', action="store_true")
+    esm_parser.add_argument('--status', help='Statuses and a few other less interesting details : autoBackupEnabled, autoBackupDay, backupLastTime, backupNextTime, rulesAndSoftwareCheckEnabled, rulesAndSoftLastCheck, rulesAndSoftNextCheck', action="store_true")
+    esm_parser.add_argument('--timezones', help='Current ESM timezone', action="store_true")
+
 
     return (parser.parse_args())
 
@@ -213,8 +224,8 @@ def config(args):
 
     conf=msiempy.NitroConfig()
 
-    if args.set :
-        conf.iset('esm')
+    if args.set is not None :
+        conf.iset(args.set)
 
     if args.list :
         print(conf)
@@ -252,6 +263,13 @@ def alarms(args):
             
             #getattr(alarms, args.action)()
 
+def esm(args):
+    esm = msiempy.device.ESM()
+    vargs=vars(args)
+    for arg in vargs :
+        if vargs[arg] == True :
+            print(getattr(esm, arg)())
+
 def main():
     
     print("""
@@ -271,6 +289,8 @@ def main():
         config(args)
     elif args.command == 'alarms' :
         alarms(args)
+    elif args.command == 'esm':
+        esm(args)
 
 
         """
