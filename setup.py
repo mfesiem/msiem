@@ -11,17 +11,17 @@ README = (HERE / "README.md").read_text()
 
 setup(
     name='msiem',
-    description="McAfee SIEM Command Line Interface and Python API",
+    description="McAfee SIEM Command Line Interface",
     url='https://github.com/tristanlatr/msiem',
     author='tristanlatr',
     author_email='tris.la.tr@gmail.com',
-    version='0.0.7',
+    version='0.1.0',
     packages=['msiem',],
     entry_points = {
-        'console_scripts': ['msiem=msiem.command:main'],
+        'console_scripts': ['msiem=msiem:main'],
     },
     install_requires=[
-          'requests','tqdm','PTable','python-dateutil'
+          'requests','tqdm','PTable','python-dateutil', 'msiempy>=0.1.6'
     ],
     tests_require=[
           'pylint',
