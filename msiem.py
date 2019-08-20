@@ -176,7 +176,7 @@ def parse_args():
     config = commands.add_parser('config', formatter_class=Formatter)
     config.set_defaults(func=config)
     config.add_argument('--print', help="Print configuration fields", action="store_true")
-    config.add_argument('--set', metavar='section', help="Will inveractively prompt for specified configuration section")
+    config.add_argument('--set', metavar='section', help="Will inveractively prompt for specified configuration section : esm or general")
 
     alarm = commands.add_parser('alarms', formatter_class=Formatter, epilog=alarms.__doc__)
     alarm.set_defaults(func=alarms)
@@ -227,7 +227,7 @@ def config(args):
     if args.set is not None :
         conf.iset(args.set)
 
-    if args.list :
+    if args.print :
         print(conf)
 
 def alarms(args):
