@@ -16,12 +16,12 @@ setup(
     author='tristanlatr',
     author_email='tris.la.tr@gmail.com',
     version='0.1.0',
-    packages=['msiem',],
+    packages=['',],
     entry_points = {
-        'console_scripts': ['msiem=msiem:main'],
+        'console_scripts': ['msiem=msiem.py:main'],
     },
     install_requires=[
-          'requests','tqdm','PTable','python-dateutil', 'msiempy>=0.1.6'
+          'msiempy>=0.1.6'
     ],
     tests_require=[
           'pylint',

@@ -161,77 +161,40 @@ import msiempy
 import msiempy.event
 import msiempy.alarm
 
+class Formatter( argparse.ArgumentDefaultsHelpFormatter, argparse.RawDescriptionHelpFormatter): pass
+
 def parse_args():
     parser = argparse.ArgumentParser(description='McAfee SIEM Command Line Interface and Python API',
-                usage='Use "msiem <command> --help" for more information.')
+                usage='Use "msiem <command> --help" for more information.', formatter_class=Formatter,)
 
     #parser.add_argument('--version', help="Show version",action="store_true")
     #parser.add_argument('-v', '--verbose', help="Increase output verbosity",action="store_true")
 
     commands = parser.add_subparsers(dest='command')
 
-    config = commands.add_parser('config')
+    config = commands.add_parser('config', formatter_class=Formatter)
     config.set_defaults(func=config)
     config.add_argument('--list', help="List configuration fields", action="store_true")
     config.add_argument('--set', help="Will inveractively prompt for configuration settings", action="store_true")
 
-    alarm = commands.add_parser('alarms')
+    alarm = commands.add_parser('alarms', formatter_class=Formatter, epilog=alarms.__doc__)
     alarm.set_defaults(func=alarms)
 
-    alarm.add_argument('--action', metavar="action", help="What to do with the alarms: [acknowledge|unacknowledge|delete]")
+    alarm.add_argument('--action', metavar="action", help="What to do with the alarms, if not specified will print only", 
+        choices=['acknowledge','unacknowledge','delete'])
+
     alarm.add_argument('--force', help="Will not prompt for confirmation to do the specified action", action="store_true")
 
-    alarm.add_argument('--time_range','-t', metavar='time_range', help='Timerange: '+str(msiempy.FilteredQueryList.POSSIBLE_TIME_RANGE))
+    alarm.add_argument('--time_range','-t', metavar='time_range', help='Timerange, choose from '+', '.join(msiempy.FilteredQueryList.POSSIBLE_TIME_RANGE), 
+        choices=msiempy.FilteredQueryList.POSSIBLE_TIME_RANGE)
     alarm.add_argument('--start_time','--t1', metavar='time', help='Start trigger date')
     alarm.add_argument('--end_time','--t2', metavar='time', help='End trigger date')
-    alarm.add_argument('--status', metavar='status', help='Status of the alarm [acknowledged|unacknowledged|all]', default='all')
+    alarm.add_argument('--status', metavar='status', help='Status of the alarm',choices=['acknowledged','unacknowledged','all'], default='all')
 
-    alarm.add_argument('--filters', '-f', metavar="'<key>=<match>'", nargs='+', type=str, help="""List of filters. Alarm related keys can be :
-        - id : The ID of the triggered alarm
-        - summary : The summary of the triggered alarm
-        - assignee : The assignee for this triggered alarm
-        - severity : The severity for this triggered alarm
-        - triggeredDate : The date this alarm was triggered
-        - acknowledgedDate : The date this triggered alarm was acknowledged
-        - acknowledgedUsername : The user that acknowledged this triggered alarm
-        - alarmName : The name of the alarm that was triggered
-        - events : A string representation of the triggering events
-        See : https://mfesiem.github.io/docs/msiempy/alarm.html#msiempy.alarm.Alarm 
-        
-        Event related keys could be (depending of config) :
-        - Rule.msg
-        - Alert.SrcPort
-        - Alert.DstPort
-        - Alert.SrcIP
-        - Alert.DstIP
-        - Alert.SrcMac
-        - Alert.DstMac
-        - Alert.LastTime
-        - Rule.NormID
-        - Alert.DSIDSigID
-        - Alert.IPSIDAlertID
-
-        - ruleName
-        - srcIp
-        - destIp
-        - protocol
-        - lastTime
-        - subtype
-        - destPort
-        - destMac
-        - srcMac
-        - srcPort
-        - deviceName
-        - sigId
-        - normId
-        - srcUser
-        - destUser
-        - normMessage
-        - normDesc
-        - host
-        - domain
-        - ipsId
-        """)
+    alarm.add_argument('--filters', '-f', metavar="'<field>=<match>'", nargs='+', type=str, help="""List of field/matchvalue filters. 
+    Alarm related fields can be : id, summary, assignee, severity, triggeredDate, acknowledgedDate, acknowledgedUsername, alarmName, events.  
+    Event related fields can be (if --query_events) : Rule.msg, Alert.SrcPort, Alert.DstPort, Alert.SrcIP, Alert.DstIP, Alert.SrcMac, Alert.DstMac, Alert.LastTime, Rule.NormID, Alert.DSIDSigID, Alert.IPSIDAlertID.  
+    Or : ruleName, srcIp, destIp, protocol, lastTime, subtype, destPort, destMac, srcMac, srcPort, deviceName, sigId, normId, srcUser, destUser, normMessage, normDesc, host, domain, ipsId.""")
     
     alarm.add_argument('--page_size', '-p', metavar='page_size', help='Size of requests', default=50, type=int)
 
@@ -241,7 +204,7 @@ def parse_args():
     alarm.add_argument('--query_slots', metavar='slots', help='The number of time slots division after the first one', default=4)
 
     alarm.add_argument('--no_events', help='Do not load unecessary event data in order to filter', action="store_true")
-    alarm.add_argument('--query_events', help='Use the query API query module to retreive events', action="store_true")
+    alarm.add_argument('--query_events', help='Use the query API query module to retreive events, much more effcient', action="store_true")
 
 
     return (parser.parse_args())
@@ -285,11 +248,12 @@ def alarms(args):
         
     if args.action is not None :
         if args.force or ('y' in input('Are you sure you want to '+str(args.action)+' those alarms ? [y/n]')):
-            raise NotImplementedError()
+            alarms.perform(getattr(msiempy.alarm.Alarm, args.action), progress=True)
+            
             #getattr(alarms, args.action)()
 
 def main():
-    args = parse_args()
+    
     print("""
                 _                
   _ __ ___  ___(_) ___ _ __ ___  
@@ -300,6 +264,8 @@ def main():
  McAfee SIEM Command Line Interface
 
     """)
+
+    args = parse_args()
 
     if args.command == 'config' :
         config(args)

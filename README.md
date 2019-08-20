@@ -85,5 +85,5 @@ optional arguments:
 
 #### Exemple
 ```
-msiem alarms --ackowledge -t LAST_3_DAYS --status ackowledged --filters ruleName=Wordpress srcIp=2.150. destIp=10.1.
+msiem alarms --ackowledge -t LAST_3_DAYS --status ackowledge --filters ruleName=Wordpress srcIp=2.150. destIp=10.1.
 ```
