@@ -77,6 +77,7 @@ def config(args):
 
     if args.set is not None :
         conf.iset(args.set)
+        conf.write()
 
     if args.print :
         print(conf)
