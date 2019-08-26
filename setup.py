@@ -21,7 +21,7 @@ setup(
         'console_scripts': ['msiem=msiem.cli:main'],
     },
     install_requires=[
-          'msiempy>=0.1.8'
+          'msiempy>=0.1.9'
     ],
     tests_require=[
           'pylint',
