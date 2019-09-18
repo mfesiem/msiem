@@ -12,21 +12,29 @@ import msiempy.device
 class Formatter( argparse.ArgumentDefaultsHelpFormatter, argparse.RawDescriptionHelpFormatter): pass
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='McAfee SIEM Command Line Interface and Python API',
-                usage='Use "msiem <command> --help" for more information.', formatter_class=Formatter,)
+    parser = argparse.ArgumentParser(description="""
+                _                
+  _ __ ___  ___(_) ___ _ __ ___  
+ | '_ ` _ \/ __| |/ _ | '_ ` _ \ 
+ | | | | | \__ | |  __| | | | | |
+ |_| |_| |_|___|_|\___|_| |_| |_|
+     
+ McAfee SIEM Command Line Interface
+
+    """, usage='Run "msiem <command> --help" for more information about a sub-command.', formatter_class=Formatter,)
 
     #parser.add_argument('--version', help="Show version",action="store_true")
     #parser.add_argument('-v', '--verbose', help="Increase output verbosity",action="store_true")
 
     commands = parser.add_subparsers(dest='command')
 
-    config = commands.add_parser('config', formatter_class=Formatter)
-    config.set_defaults(func=config)
+    config = commands.add_parser('config', formatter_class=Formatter, epilog=config_cmd.__doc__)
+    config.set_defaults(func=config_cmd)
     config.add_argument('--print', help="Print configuration fields", action="store_true")
     config.add_argument('--set', metavar='section', help="Will inveractively prompt for specified configuration section : esm or general")
 
-    alarm = commands.add_parser('alarms', formatter_class=Formatter, epilog=alarms.__doc__)
-    alarm.set_defaults(func=alarms)
+    alarm = commands.add_parser('alarms', formatter_class=Formatter, epilog=alarms_cmd.__doc__)
+    alarm.set_defaults(func=alarms_cmd)
 
     alarm.add_argument('--action', metavar="action", help="What to do with the alarms, if not specified will print only", 
         choices=['acknowledge','unacknowledge','delete'])
@@ -46,7 +54,7 @@ def parse_args():
     
     alarm.add_argument('--alarms_fields', metavar="list of fields", nargs='+', help="List of fields you want to appear in the alarm table. Overwritten by --json", default=[])
     alarm.add_argument('--events_fields', metavar="list of fields", nargs='+', help="List of fields you want to appear in the events sub tables. Overwritten by --json", default=[])
-    alarm.add_argument('--json', action='store_true', help="Prints the raw AlarmManager json object with all loaded fields")
+    alarm.add_argument('--json', action='store_true', help="Prints the raw json object with all loaded fields")
 
     alarm.add_argument('--page_size', '-p', metavar='page_size', help='Size of requests', default=100, type=int)
 
@@ -58,8 +66,8 @@ def parse_args():
     alarm.add_argument('--no_events', help='Do not load unecessary event data in order to filter', action="store_true")
     alarm.add_argument('--query_events', help='Use the query API query module to retreive events, much more effcient', action="store_true")
 
-    esm_parser = commands.add_parser('esm', formatter_class=Formatter)
-    esm_parser.set_defaults(func=esm)
+    esm_parser = commands.add_parser('esm', formatter_class=Formatter, epilog=esm_cmd.__doc__)
+    esm_parser.set_defaults(func=esm_cmd)
     esm_parser.add_argument('--version', help='Show ESM version', action="store_true")
     esm_parser.add_argument('--time', help='time (GMT)', action="store_true")
     esm_parser.add_argument('--disks', help='disk status', action="store_true")
@@ -71,7 +79,7 @@ def parse_args():
 
     return (parser.parse_args())
 
-def config(args):
+def config_cmd(args):
 
     conf=msiempy.NitroConfig()
 
@@ -82,7 +90,7 @@ def config(args):
     if args.print :
         print(conf)
 
-def alarms(args):
+def alarms_cmd(args):
 
     filters = [item for sublist in args.filters for item in sublist]
 
@@ -93,11 +101,11 @@ def alarms(args):
         status_filter=args.status,
         filters=[((item.split('=')[0],item.split('=')[1])) for item in filters],
         page_size=args.page_size,
-        # max_query_depth = args.max_queries,
+        #max_query_depth = 1,
     )
     alarms.load_data(
         workers=args.workers,
-        # slots=args.query_slots,
+        # slots=10,
         # delta=args.query_delta,
         no_detailed_filter = args.no_events,
         use_query = args.query_events,
@@ -107,12 +115,12 @@ def alarms(args):
         text = alarms.json
     else:
         if args.no_events :
-            text = alarms.get_text()
+            text = alarms.get_text() if len(args.alarms_fields)==0 else alarms.get_text(fields=args.alarms_fields)
         else:
             try :
-                text=alarms.get_text(fields=['alarmName','triggeredDate', 'acknowledgedDate', 'events']+args.alarms_fields,
+                text=alarms.get_text(fields=['alarmName','triggeredDate', 'acknowledgedDate', 'events'] if len(args.alarms_fields)==0 else args.alarms_fields,
                     get_text_nest_attr=dict(fields=(['ruleName','srcIp','destIp', 'srcUser', 'host', 'sigId'] if not args.query_events 
-                        else ['Rule.msg','Alert.SrcIP','Alert.DstIP','Alert.DSIDSigID'])+args.events_fields)
+                        else ['Rule.msg','Alert.SrcIP','Alert.DstIP','Alert.DSIDSigID']) if len(args.events_fields)==0 else args.events_fields)
                     )
             except KeyError:
                 text=alarms.json + "\n\n" + alarms.text + "\n\nWARNING : Sorry the table you requested coulnd't be generated. \nHere is printed a global table and upper the json content. \nThe SIEM query respond with very inconsistent data and returned fields don't necessary match requested ones..."
@@ -122,37 +130,28 @@ def alarms(args):
     if args.action is not None :
         if args.force or ('y' in input('Are you sure you want to '+str(args.action)+' those alarms ? [y/n]')):
             alarms.perform(getattr(msiempy.alarm.Alarm, args.action), progress=True)
-            
-            #getattr(alarms, args.action)()
 
-def esm(args):
+def esm_cmd(args):
     esm = msiempy.device.ESM()
     vargs=vars(args)
     for arg in vargs :
-        if vargs[arg] == True :
+        if vargs[arg] == True and hasattr(esm, vargs[arg]):
             print(getattr(esm, arg)())
 
 def main():
     
-    print("""
-                _                
-  _ __ ___  ___(_) ___ _ __ ___  
- | '_ ` _ \/ __| |/ _ | '_ ` _ \ 
- | | | | | \__ | |  __| | | | | |
- |_| |_| |_|___|_|\___|_| |_| |_|
-     
- McAfee SIEM Command Line Interface
-
-    """)
+    print()
 
     args = parse_args()
 
     if args.command == 'config' :
-        config(args)
+        config_cmd(args)
     elif args.command == 'alarms' :
-        alarms(args)
+        alarms_cmd(args)
     elif args.command == 'esm':
-        esm(args)
+        esm_cmd(args)
+    else :
+        pass
 
 
         """

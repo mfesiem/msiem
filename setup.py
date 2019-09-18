@@ -15,7 +15,7 @@ setup(
     url='https://github.com/tristanlatr/msiem',
     author='tristanlatr',
     author_email='tris.la.tr@gmail.com',
-    version='0.1.5',
+    version='0.1.6',
     packages=['msiem',],
     entry_points = {
         'console_scripts': ['msiem=msiem.cli:main'],
