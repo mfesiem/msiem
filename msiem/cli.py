@@ -107,7 +107,7 @@ def alarms_cmd(args):
         workers=args.workers,
         # slots=10,
         # delta=args.query_delta,
-        no_detailed_filter = args.no_events,
+        events_details = not args.no_events,
         use_query = args.query_events,
         extra_fields=args.events_fields
     )

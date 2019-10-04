@@ -15,13 +15,13 @@ setup(
     url='https://github.com/tristanlatr/msiem',
     author='tristanlatr',
     author_email='tris.la.tr@gmail.com',
-    version='0.1.6',
+    version='0.1.7',
     packages=['msiem',],
     entry_points = {
         'console_scripts': ['msiem=msiem.cli:main'],
     },
     install_requires=[
-          'msiempy>=0.1.11'
+          'msiempy>=0.1.13'
     ],
     tests_require=[
           'pylint',
