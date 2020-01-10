@@ -11,6 +11,9 @@ import msiempy.device
 
 class Formatter( argparse.ArgumentDefaultsHelpFormatter, argparse.RawDescriptionHelpFormatter): pass
 
+DEFAULT_ALARM_FIELDS_TABLE=['alarmName','triggeredDate', 'acknowledgedDate', 'events']
+DEFAULT_EVENT_FIELDS_TABLE=['ruleName','srcIp','destIp', 'srcUser', 'host', 'sigId']
+
 def parse_args():
     parser = argparse.ArgumentParser(description="""
                 _                
@@ -36,7 +39,7 @@ def parse_args():
     alarm = commands.add_parser('alarms', formatter_class=Formatter, epilog=alarms_cmd.__doc__)
     alarm.set_defaults(func=alarms_cmd)
 
-    alarm.add_argument('--action', metavar="action", help="What to do with the alarms, if not specified will print only", 
+    alarm.add_argument('--action', metavar="action", help="What to do with the alarms, if not specified will print only. Chose from 'acknowledge','unacknowledge','delete'", 
         choices=['acknowledge','unacknowledge','delete'])
 
     alarm.add_argument('--force', help="Will not prompt for confirmation to do the specified action", action="store_true")
@@ -45,18 +48,21 @@ def parse_args():
         choices=msiempy.FilteredQueryList.POSSIBLE_TIME_RANGE, default='CURRENT_DAY')
     alarm.add_argument('--start_time','--t1', metavar='time', help='Start trigger date')
     alarm.add_argument('--end_time','--t2', metavar='time', help='End trigger date')
-    alarm.add_argument('--status', metavar='status', help='Status of the alarm',choices=['acknowledged','unacknowledged','all'], default='all')
+    alarm.add_argument('--status', metavar='status', help="Status of the alarm. Chose from 'acknowledged','unacknowledged','all'",choices=['acknowledged','unacknowledged','all'], default='all')
 
-    alarm.add_argument('--filters', '-f', metavar="'<field>=<match>'", action='append', nargs='+', help="""List of field/matchvalue filters. 
-    Alarm related fields can be : id, summary, assignee, severity, triggeredDate, acknowledgedDate, acknowledgedUsername, alarmName, events.  
-    Event related fields can be (if --query_events) : Rule.msg, Alert.SrcPort, Alert.DstPort, Alert.SrcIP, Alert.DstIP, Alert.SrcMac, Alert.DstMac, Alert.LastTime, Rule.NormID, Alert.DSIDSigID, Alert.IPSIDAlertID.  
-    Or : ruleName, srcIp, destIp, protocol, lastTime, subtype, destPort, destMac, srcMac, srcPort, deviceName, sigId, normId, srcUser, destUser, normMessage, normDesc, host, domain, ipsId.""", default=[[]])
+    alarm.add_argument('--filters', '-f', metavar="'<field>=<match>'", action='append', nargs='+', help="""List of alarm related field/matchvalue filters. 
+    Alarm related fields can be : id, summary, assignee, severity, triggeredDate, acknowledgedDate, acknowledgedUsername, alarmName, events, and others""", default=[[]])
+
+    alarm.add_argument('--event_filters', '-e', metavar="'<field>=<match>'", action='append', nargs='+', help="""List of triggering event related field/matchvalue filters. 
+    Event related fields can be : ruleName, srcIp, destIp, protocol, lastTime, subtype, destPort, destMac, srcMac, srcPort, deviceName, sigId, normId, srcUser, destUser, normMessage, normDesc, host, domain, ipsId.
+    Or (if --query_events) : Rule.msg, Alert.SrcPort, Alert.DstPort, Alert.SrcIP, Alert.DstIP, Alert.SrcMac, Alert.DstMac, Alert.LastTime, Rule.NormID, Alert.DSIDSigID, Alert.IPSIDAlertID.""", default=[[]])
     
-    alarm.add_argument('--alarms_fields', metavar="list of fields", nargs='+', help="List of fields you want to appear in the alarm table. Overwritten by --json", default=[])
-    alarm.add_argument('--events_fields', metavar="list of fields", nargs='+', help="List of fields you want to appear in the events sub tables. Overwritten by --json", default=[])
+    alarm.add_argument('--alarms_fields', metavar="list of fields", nargs='+', help="List of fields you want to appear in the alarm table. Overwritten by --json", default=DEFAULT_ALARM_FIELDS_TABLE)
+    alarm.add_argument('--events_fields', metavar="list of fields", nargs='+', help="List of fields you want to appear in the events sub tables. Overwritten by --json. If you use --query_events, this list will be used to query needed values, you must specify all fields you want to filter on with ewvent_filters.", default=DEFAULT_EVENT_FIELDS_TABLE)
     alarm.add_argument('--json', action='store_true', help="Prints the raw json object with all loaded fields")
 
-    alarm.add_argument('--page_size', '-p', metavar='page_size', help='Size of requests', default=100, type=int)
+    alarm.add_argument('--page_size', '-p', metavar='page_size', help='Size of requests', default=500, type=int)
+    alarm.add_argument('--pages', '-n', metavar='pages', help='Number of alarm pages to load', default=1, type=int)
 
     alarm.add_argument('--workers', metavar="workers", help='Number of max asynch workers', default=10, type=int)
     #alarm.add_argument('--max_queries', metavar="max_queries", help='Number of times the query can be slipted to get more data', default=0, type=int)
@@ -76,7 +82,6 @@ def parse_args():
     esm_parser.add_argument('--status', help='Statuses and a few other less interesting details : autoBackupEnabled, autoBackupDay, backupLastTime, backupNextTime, rulesAndSoftwareCheckEnabled, rulesAndSoftLastCheck, rulesAndSoftNextCheck', action="store_true")
     esm_parser.add_argument('--timezones', help='Current ESM timezone', action="store_true")
 
-
     return (parser.parse_args())
 
 def config_cmd(args):
@@ -92,7 +97,10 @@ def config_cmd(args):
 
 def alarms_cmd(args):
 
+    print(args)
+
     filters = [item for sublist in args.filters for item in sublist]
+    event_filters = [item for sublist in args.event_filters for item in sublist]
 
     alarms=msiempy.alarm.AlarmManager(
         time_range=args.time_range,
@@ -100,6 +108,7 @@ def alarms_cmd(args):
         end_time=args.end_time,
         status_filter=args.status,
         filters=[((item.split('=')[0],item.split('=')[1])) for item in filters],
+        event_filters=[((item.split('=')[0],item.split('=')[1])) for item in event_filters],
         page_size=args.page_size,
         #max_query_depth = 1,
     )
@@ -109,22 +118,15 @@ def alarms_cmd(args):
         # delta=args.query_delta,
         events_details = not args.no_events,
         use_query = args.query_events,
-        extra_fields=args.events_fields
+        extra_fields=args.events_fields,
+        pages=args.pages
     )
     if args.json:
         text = alarms.json
-    else:
-        if args.no_events :
-            text = alarms.get_text() if len(args.alarms_fields)==0 else alarms.get_text(fields=args.alarms_fields)
-        else:
-            try :
-                text=alarms.get_text(fields=['alarmName','triggeredDate', 'acknowledgedDate', 'events'] if len(args.alarms_fields)==0 else args.alarms_fields,
-                    get_text_nest_attr=dict(fields=(['ruleName','srcIp','destIp', 'srcUser', 'host', 'sigId'] if not args.query_events 
-                        else ['Rule.msg','Alert.SrcIP','Alert.DstIP','Alert.DSIDSigID']) if len(args.events_fields)==0 else args.events_fields)
-                    )
-            except KeyError:
-                text=alarms.json + "\n\n" + alarms.text + "\n\nWARNING : Sorry the table you requested coulnd't be generated. \nHere is printed a global table and upper the json content. \nThe SIEM query respond with very inconsistent data and returned fields don't necessary match requested ones..."
-
+    else: 
+        text=alarms.get_text(fields=args.alarms_fields, 
+            get_text_nest_attr=dict(fields=(args.events_fields if not args.query_events else None if args.events_fields==DEFAULT_EVENT_FIELDS_TABLE else args.events_fields)))
+           
     print(text)
         
     if args.action is not None :
@@ -139,8 +141,6 @@ def esm_cmd(args):
             print(getattr(esm, arg)())
 
 def main():
-    
-    print()
 
     args = parse_args()
 
@@ -151,7 +151,7 @@ def main():
     elif args.command == 'esm':
         esm_cmd(args)
     else :
-        pass
+        print('McAfee SIEM Command Line Interface.\nRun "msiem --help" for more information.')
 
 
         """

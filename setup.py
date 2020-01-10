@@ -14,14 +14,14 @@ setup(
     description="McAfee SIEM Command Line Interface",
     url='https://github.com/tristanlatr/msiem',
     author='tristanlatr',
-    author_email='tris.la.tr@gmail.com',
-    version='0.1.7',
+    author_email='trislatr@gmail.com',
+    version='0.1.8',
     packages=['msiem',],
     entry_points = {
         'console_scripts': ['msiem=msiem.cli:main'],
     },
     install_requires=[
-          'msiempy>=0.1.13'
+          'msiempy>=0.2.0'
     ],
     tests_require=[
           'pylint',
