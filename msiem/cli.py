@@ -97,7 +97,7 @@ def config_cmd(args):
 
 def alarms_cmd(args):
 
-    print(args)
+    #print(args)
 
     filters = [item for sublist in args.filters for item in sublist]
     event_filters = [item for sublist in args.event_filters for item in sublist]
@@ -107,8 +107,8 @@ def alarms_cmd(args):
         start_time=args.start_time,
         end_time=args.end_time,
         status_filter=args.status,
-        filters=[((item.split('=')[0],item.split('=')[1])) for item in filters],
-        event_filters=[((item.split('=')[0],item.split('=')[1])) for item in event_filters],
+        filters=[((item.split('=')[0],item.split('=')[1])) for item in filters if len(item.split('=')[1])>0],
+        event_filters=[((item.split('=')[0],item.split('=')[1])) for item in event_filters if len(item.split('=')[1])>0],
         page_size=args.page_size,
         #max_query_depth = 1,
     )
@@ -125,7 +125,7 @@ def alarms_cmd(args):
         text = alarms.json
     else: 
         text=alarms.get_text(fields=args.alarms_fields, 
-            get_text_nest_attr=dict(fields=(args.events_fields if not args.query_events else None if args.events_fields==DEFAULT_EVENT_FIELDS_TABLE else args.events_fields)))
+            get_text_nest_attr=dict(max_column_width=40, fields=(args.events_fields if not args.query_events else None if args.events_fields==DEFAULT_EVENT_FIELDS_TABLE else args.events_fields)))
            
     print(text)
         
