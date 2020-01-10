@@ -11,8 +11,9 @@ import msiempy.device
 
 class Formatter( argparse.ArgumentDefaultsHelpFormatter, argparse.RawDescriptionHelpFormatter): pass
 
-DEFAULT_ALARM_FIELDS_TABLE=['alarmName','triggeredDate', 'acknowledgedDate', 'events']
-DEFAULT_EVENT_FIELDS_TABLE=['ruleName','srcIp','destIp', 'srcUser', 'host', 'sigId']
+DEFAULT_ALARM_FIELDS=['alarmName','triggeredDate', 'acknowledgedDate', 'events']
+DEFAULT_EVENT_FIELDS=['ruleName', 'srcIp', 'destIp' ]
+DEFAULT_EVENT_FIELDS_QUERY=['Rule.msg', 'Alert.SrcIP', 'Alert.DstIP', 'Description', 'Device_URL']
 
 def parse_args():
     parser = argparse.ArgumentParser(description="""
@@ -57,17 +58,14 @@ def parse_args():
     Event related fields can be : ruleName, srcIp, destIp, protocol, lastTime, subtype, destPort, destMac, srcMac, srcPort, deviceName, sigId, normId, srcUser, destUser, normMessage, normDesc, host, domain, ipsId.
     Or (if --query_events) : Rule.msg, Alert.SrcPort, Alert.DstPort, Alert.SrcIP, Alert.DstIP, Alert.SrcMac, Alert.DstMac, Alert.LastTime, Rule.NormID, Alert.DSIDSigID, Alert.IPSIDAlertID.""", default=[[]])
     
-    alarm.add_argument('--alarms_fields', metavar="list of fields", nargs='+', help="List of fields you want to appear in the alarm table. Overwritten by --json", default=DEFAULT_ALARM_FIELDS_TABLE)
-    alarm.add_argument('--events_fields', metavar="list of fields", nargs='+', help="List of fields you want to appear in the events sub tables. Overwritten by --json. If you use --query_events, this list will be used to query needed values, you must specify all fields you want to filter on with ewvent_filters.", default=DEFAULT_EVENT_FIELDS_TABLE)
+    alarm.add_argument('--alarms_fields', metavar="list of fields", nargs='+', help="List of fields that appear in the alarm table. Overwritten by --json", default=DEFAULT_ALARM_FIELDS)
+    alarm.add_argument('--events_fields', metavar="list of fields", nargs='+', help="List of fields that appear in the events sub tables. Default value: {}. If you use --query_events, this list will be used to query needed values, you must specify all fields you want to filter on with ewvent_filters. Default value if --query_events: {}. Overwritten by --json.".format(DEFAULT_EVENT_FIELDS, DEFAULT_EVENT_FIELDS_QUERY), default=None)
     alarm.add_argument('--json', action='store_true', help="Prints the raw json object with all loaded fields")
 
     alarm.add_argument('--page_size', '-p', metavar='page_size', help='Size of requests', default=500, type=int)
     alarm.add_argument('--pages', '-n', metavar='pages', help='Number of alarm pages to load', default=1, type=int)
 
     alarm.add_argument('--workers', metavar="workers", help='Number of max asynch workers', default=10, type=int)
-    #alarm.add_argument('--max_queries', metavar="max_queries", help='Number of times the query can be slipted to get more data', default=0, type=int)
-    #alarm.add_argument('--query_delta', metavar='delta', help='The timedelta of first time slots division', default=None)
-    #alarm.add_argument('--query_slots', metavar='slots', help='The number of time slots division after the first one', default=10, type=int)
 
     alarm.add_argument('--no_events', help='Do not load unecessary event data in order to filter', action="store_true")
     alarm.add_argument('--query_events', help='Use the query API query module to retreive events, much more effcient', action="store_true")
@@ -110,22 +108,26 @@ def alarms_cmd(args):
         filters=[((item.split('=')[0],item.split('=')[1])) for item in filters if len(item.split('=')[1])>0],
         event_filters=[((item.split('=')[0],item.split('=')[1])) for item in event_filters if len(item.split('=')[1])>0],
         page_size=args.page_size,
-        #max_query_depth = 1,
     )
+
+    event_fields=list()
+    if args.events_fields == None :
+        if args.query_events : event_fields=DEFAULT_EVENT_FIELDS_QUERY
+        else : event_fields=DEFAULT_EVENT_FIELDS
+    else : event_fields=args.events_fields
+
     alarms.load_data(
         workers=args.workers,
-        # slots=10,
-        # delta=args.query_delta,
         events_details = not args.no_events,
         use_query = args.query_events,
-        extra_fields=args.events_fields,
+        extra_fields=event_fields,
         pages=args.pages
     )
     if args.json:
         text = alarms.json
     else: 
         text=alarms.get_text(fields=args.alarms_fields, 
-            get_text_nest_attr=dict(max_column_width=40, fields=(args.events_fields if not args.query_events else None if args.events_fields==DEFAULT_EVENT_FIELDS_TABLE else args.events_fields)))
+            get_text_nest_attr=dict(max_column_width=40, fields=event_fields))
            
     print(text)
         
