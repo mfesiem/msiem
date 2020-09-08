@@ -9,6 +9,10 @@
      
  McAfee SIEM Command Line Interface
  ```
+*Only interactions with configuration, ESM, and Alarm management is currently supported.*  
+*Simple events query, watchlist and devtree are still missing*  
+
+Any co contributions would be great.  
 
 Based on the work of [andywalen](https://github.com/andywalden) and the [McAfee SIEM API Python wrapper](https://github.com/mfesiem/msiempy)
 
