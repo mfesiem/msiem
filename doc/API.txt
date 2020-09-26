@@ -1,0 +1,24 @@
+usage: msiem api [-h] [-m <method>] [-d <JSON string or file>]
+                 [-a <key>=<value> [<key>=<value> ...]] [-l]
+
+    Quickly make API requests to any enpoints with any data.  
+
+    Exemple
+
+    ```
+    msiem api --method "v2/alarmGetTriggeredAlarms?triggeredTimeRange=LAST_24_HOURS&status=&pageSize=500&pageNumber=1" --data {}
+    ```
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -m <method>, --method <method>
+                        SIEM API method name or NitroSession.PARAMS keyword. Exemple:
+                        'v2/qryGetSelectFields' or 'get_possible_fields', see
+                        https://mfesiem.github.io/docs/msiempy/core/session.html . (default: None)
+  -d <JSON string or file>, --data <JSON string or file>
+                        POST data, in the case of a API method name call. (default: {})
+  -a <key>=<value> [<key>=<value> ...], --args <key>=<value> [<key>=<value> ...]
+                        NitroSession.PARAMS interpolation parameters, in the case of a
+                        NitroSession.PARAMS keyword call. (default: [[]])
+  -l, --list            List all supported SIEM API calls with keywords and parameter mapping. Note that
+                        you can still request any endpoint without paramater mapping. (default: False)

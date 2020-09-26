@@ -1,0 +1,70 @@
+usage: msiem alarms [-h] [--action action] [--force] [--time_range time_range]
+                    [--start_time time] [--end_time time] [--status status]
+                    [--filters '<field>=<match>' ['<field>=<match>' ...]]
+                    [--event_filters '<field>=<match>' ['<field>=<match>' ...]]
+                    [--alarms_fields list of fields [list of fields ...]]
+                    [--events_fields list of fields [list of fields ...]]
+                    [--json] [--page_size page_size] [--pages pages]
+                    [--workers workers] [--no_events] [--query_events]
+
+    Query alarms with alarms and events based regex filters.  
+    Print, acknowledge, unacknowledge and delete alarms.  
+
+    Exemples:  
+
+    Acknowledges the (unacknowledged) alarms triggered in the last 3 days that mention "HTTP: SQL Injection Attempt Detected" in the triggered event name and destinated to 10.55.16.99 :
+    ```
+    $ msiem alarms --action acknowledge     -t LAST_24_HOURS     --status unacknowledged     --filters "ruleName=HTTP: SQL Injection Attempt Detected" "destIp=10.55.16.99"
+    ```
+
+    Prints the alarms triggered in the last hour using the query module to retreive events informations and request for specific fields :
+    ```
+    $ msiem alarms -t LAST_HOUR     --query_events     --alarms_fields acknowledgedDate alarmName events     --events_fields Alert.LastTime Rule.msg Alert.DstIP
+    ```
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --action action       What to do with the alarms, if not specified will print only. Chose from
+                        'acknowledge','unacknowledge','delete' (default: None)
+  --force               Will not prompt for confirmation to do the specified action (default: False)
+  --time_range time_range, -t time_range
+                        Timerange, choose from CUSTOM, LAST_MINUTE, LAST_10_MINUTES, LAST_30_MINUTES,
+                        LAST_HOUR, CURRENT_DAY, PREVIOUS_DAY, LAST_24_HOURS, LAST_2_DAYS, LAST_3_DAYS,
+                        CURRENT_WEEK, PREVIOUS_WEEK, CURRENT_MONTH, PREVIOUS_MONTH, CURRENT_QUARTER,
+                        PREVIOUS_QUARTER, CURRENT_YEAR, PREVIOUS_YEAR (default: CURRENT_DAY)
+  --start_time time, --t1 time
+                        Start trigger date (default: None)
+  --end_time time, --t2 time
+                        End trigger date (default: None)
+  --status status       Status of the alarm. Chose from 'acknowledged','unacknowledged','all' (default:
+                        all)
+  --filters '<field>=<match>' ['<field>=<match>' ...], -f '<field>=<match>' ['<field>=<match>' ...]
+                        List of alarm related field/matchvalue filters. Repeatable. Alarm related fields
+                        can be : id, summary, assignee, severity, triggeredDate, acknowledgedDate,
+                        acknowledgedUsername, alarmName, events, and others (default: [[]])
+  --event_filters '<field>=<match>' ['<field>=<match>' ...], -e '<field>=<match>' ['<field>=<match>' ...]
+                        List of triggering event related field/matchvalue filters. Repeatable. Event
+                        related fields can be : ruleName, srcIp, destIp, protocol, lastTime, subtype,
+                        destPort, destMac, srcMac, srcPort, deviceName, sigId, normId, srcUser,
+                        destUser, normMessage, normDesc, host, domain, ipsId, etc... Or (if
+                        --query_events) : Rule.msg, Alert.SrcPort, Alert.DstPort, Alert.SrcIP,
+                        Alert.DstIP, Alert.SrcMac, Alert.DstMac, Alert.LastTime, Rule.NormID,
+                        Alert.DSIDSigID, Alert.IPSIDAlertID, etc... (default: [[]])
+  --alarms_fields list of fields [list of fields ...]
+                        List of fields that appear in the alarm table. Overwritten by --json (default:
+                        ['alarmName', 'triggeredDate', 'acknowledgedDate', 'events'])
+  --events_fields list of fields [list of fields ...]
+                        List of fields that appear in the events sub tables. Default value: ['ruleName',
+                        'srcIp', 'destIp']. If you use --query_events, this list will be used to query
+                        needed values, you must specify all fields you want to filter on with
+                        ewvent_filters. Default value if --query_events: ['Rule.msg', 'Alert.SrcIP',
+                        'Alert.DstIP']. Overwritten by --json. (default: None)
+  --json                Prints the raw json object with all loaded fields (default: False)
+  --page_size page_size, -p page_size
+                        Size of requests (default: 500)
+  --pages pages, -n pages
+                        Number of alarm pages to load (default: 1)
+  --workers workers     Number of max asynch workers (default: 10)
+  --no_events           Do not load the complete trigerring events informations. (default: False)
+  --query_events        Use the query module to retreive events, much more effcient. Event keys will be
+                        like 'Alert.SrcIP' instead of 'srcIp' (default: False)

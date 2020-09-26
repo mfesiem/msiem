@@ -1,0 +1,39 @@
+usage: msiem events [-h] [--time_range time_range] [--start_time time]
+                    [--end_time time] [--filters <filter> [<filter> ...]]
+                    [--fields list of fields [list of fields ...]] [--json]
+                    [--limit limit]
+
+    Query events with filters, add note to events.  
+    
+    With simpler filter
+    ```
+    msiem events --filter DstIP=127.0.0.1 --field SrcIP DstIP   
+    ```
+    
+    Specific operatior and multiple values filter
+    ```
+    msiem events --filter SrcIP IN 22.0.0.0/8 10.0.0.0/8 --fields SrcIP DstIP
+    ```
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --time_range time_range, -t time_range
+                        Timerange, choose from CUSTOM, LAST_MINUTE, LAST_10_MINUTES, LAST_30_MINUTES,
+                        LAST_HOUR, CURRENT_DAY, PREVIOUS_DAY, LAST_24_HOURS, LAST_2_DAYS, LAST_3_DAYS,
+                        CURRENT_WEEK, PREVIOUS_WEEK, CURRENT_MONTH, PREVIOUS_MONTH, CURRENT_QUARTER,
+                        PREVIOUS_QUARTER, CURRENT_YEAR, PREVIOUS_YEAR (default: CURRENT_DAY)
+  --start_time time, --t1 time
+                        Start trigger date (default: None)
+  --end_time time, --t2 time
+                        End trigger date (default: None)
+  --filters <filter> [<filter> ...], -f <filter> [<filter> ...]
+                        List of Event field/value filters: '<field>=<value>' or '<field>' '<operator>'
+                        '<value1>' '<value2>...'. Repeatable. Will generate only EsmBasicValue filters.
+                        Filter fields can be: Rule.msg, Alert.SrcPort, Alert.DstPort, Alert.SrcIP,
+                        Alert.DstIP, Alert.SrcMac, Alert.DstMac, Alert.LastTime, Rule.NormID,
+                        Alert.DSIDSigID, Alert.IPSIDAlertID, etc... (default: [[]])
+  --fields list of fields [list of fields ...]
+                        List of fields that appear in the events table. Default value: ['Rule.msg',
+                        'Alert.SrcIP', 'Alert.DstIP']. (default: None)
+  --json                Prints the raw json object with all loaded fields (default: False)
+  --limit limit         Size of requests (default: 500)

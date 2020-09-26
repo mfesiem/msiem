@@ -6,25 +6,25 @@ import pathlib
 # The directory containing this file
 HERE = pathlib.Path(__file__).parent
 
+#Version of the project
+version = {}
+exec((HERE / "msiem" / "__version__.py").read_text(), version)
+
 # The text of the README file
 README = (HERE / "README.md").read_text()
 
 setup(
     name='msiem',
     description="McAfee SIEM Command Line Interface",
-    url='https://github.com/tristanlatr/msiem',
-    author='tristanlatr',
-    author_email='trislatr@gmail.com',
-    version='0.2.0',
+    url='https://github.com/mfesiem/msiem',
+    author='tristanlatr, andywalden',
+    version=version['__version__'],
     packages=['msiem',],
     entry_points = {
         'console_scripts': ['msiem=msiem.cli:main'],
     },
     install_requires=[
-          'msiempy>=0.2.0'
-    ],
-    tests_require=[
-          'pylint',
+          'msiempy'
     ],
     classifiers=[
         "Programming Language :: Python :: 3",
