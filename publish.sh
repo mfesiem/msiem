@@ -5,3 +5,5 @@ python3 setup.py clean
 rm -rf ./dist
 rm -fr ./build
 rm -fr ./msiem.egg-info
+
+./doc.sh
