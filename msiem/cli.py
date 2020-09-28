@@ -1,22 +1,25 @@
 # -*- coding: utf-8 -*-
 """
-msiem cli
+CLI
 """
 
 import argparse
 import json
 from urllib.parse import urlparse
 from string import Template
+
+import textwrap as _textwrap
+from pprint import pprint
+import requests
+from lxml import etree
+from io import BytesIO
+
 from msiempy.core.utils import tob64
 from msiempy import FilteredQueryList, NitroConfig, AlarmManager, Alarm, EventManager, FieldFilter, Event, ESM, NitroSession
 
-from .__version__ import __version__
-from .__pathutils__ import is_path_exists_or_creatable
-from .dstools import dstools
-
-# argparse.RawDescriptionHelpFormatter
-import textwrap as _textwrap
-from pprint import pprint
+from msiem.__version__ import __version__
+from msiem.__pathutils__ import is_path_exists_or_creatable
+from msiem.dstools import dstools
 
 class Formatter(argparse.ArgumentDefaultsHelpFormatter, argparse.RawDescriptionHelpFormatter):
     def _split_lines(self, text, width):
@@ -27,16 +30,11 @@ DEFAULT_ALARM_FIELDS=['alarmName','triggeredDate', 'acknowledgedDate', 'events']
 DEFAULT_EVENT_FIELDS=['ruleName', 'srcIp', 'destIp' ]
 DEFAULT_EVENT_FIELDS_QUERY=['Rule.msg', 'Alert.SrcIP', 'Alert.DstIP' ]
 
-def parse_args():
-    parser = argparse.ArgumentParser(description="""                _                
-  _ __ ___  ___(_) ___ _ __ ___  
- | '_ ` _ \/ __| |/ _ | '_ ` _ \ 
- | | | | | \__ | |  __| | | | | |
- |_| |_| |_|___|_|\___|_| |_| |_| CLI
-     
-McAfee SIEM Command Line Interface {msiem_version}
-License: MIT
-Credits: Andy Walden, Tristan Landes
+def get_parser():
+    parser = argparse.ArgumentParser(description="""McAfee SIEM Command Line Interface {msiem_version}  
+
+    License: MIT  
+    Credits: Andy Walden, Tristan Landes  
 
 Run 'msiem <command> --help' for more information about a sub-command.""".format(
         msiem_version=__version__,),
@@ -117,23 +115,27 @@ Run 'msiem <command> --help' for more information about a sub-command.""".format
     events_parser.add_argument('--end_time','--t2', metavar='time', help='End trigger date')
     events_parser.add_argument('--filters', '-f', metavar="<filter>", action='append', nargs='+', help="""List of Event field/value filters: '<field>=<value>' or '<field>' '<operator>' '<value1>' '<value2>...'. Repeatable. Will generate only EsmBasicValue filters.   
     Filter fields can be: Rule.msg, Alert.SrcPort, Alert.DstPort, Alert.SrcIP, Alert.DstIP, Alert.SrcMac, Alert.DstMac, Alert.LastTime, Rule.NormID, Alert.DSIDSigID, Alert.IPSIDAlertID, etc...""", default=[[]])
-    events_parser.add_argument('--fields', metavar="list of fields", nargs='+', help="List of fields that appear in the events table. Default value: {}. ".format(DEFAULT_EVENT_FIELDS_QUERY), default=None)
+    events_parser.add_argument('--fields', metavar="<field>", nargs='+', help="List of fields that appear in the events table. Default value: {}. ".format(DEFAULT_EVENT_FIELDS_QUERY), default=None)
     events_parser.add_argument('--json', action='store_true', help="Prints the raw json object with all loaded fields")
     events_parser.add_argument('--limit', metavar='limit', help='Size of requests', default=500, type=int)
 
     ### API ###
     api_parser = commands.add_parser('api', formatter_class=Formatter, help="Quickly make API requests to any enpoints with any data.  ", description=api_cmd.__doc__)
-    api_parser.add_argument('-m','--method', metavar='<method>', help="SIEM API method name or NitroSession.PARAMS keyword. Exemple: 'v2/qryGetSelectFields' or 'get_possible_fields', see https://mfesiem.github.io/docs/msiempy/core/session.html .")
+    api_parser.add_argument('-m','--method', metavar='<method>', help="SIEM API method name or NitroSession.PARAMS keyword. Exemple: 'v2/qryGetSelectFields' or 'get_possible_fields', see --list for full details .")
     api_parser.add_argument('-d','--data', metavar='<JSON string or file>', help='POST data, in the case of a API method name call.  ', default={})
     api_parser.add_argument('-a', '--args', metavar='<key>=<value>', help='NitroSession.PARAMS interpolation parameters, in the case of a NitroSession.PARAMS keyword call.  ', action='append', nargs='+', default=[[]])
-    api_parser.add_argument('-l', '--list', action='store_true', help='List all supported SIEM API calls with keywords and parameter mapping. Note that you can still request any endpoint without paramater mapping. ' )
-    
-    return (parser.parse_args())
+    api_parser.add_argument('-l', '--list', action='store_true', help='List all available SIEM API calls, and supported calls with keywords and parameter mapping requests. ' )
+
+    return parser
+
+def parse_args():
+    return (get_parser().parse_args())
 
 def config_cmd(args):
     """
-    Set and print your msiempy config.  
-    """
+Set and print your msiempy config.  
+
+"""
 
     conf=NitroConfig() # ConfigParser object
 
@@ -155,26 +157,32 @@ def config_cmd(args):
 
 def alarms_cmd(args):
     """
-    Query alarms with alarms and events based regex filters.  
-    Print, acknowledge, unacknowledge and delete alarms.  
+Query alarms with alarms and events based regex filters.  
+Print, acknowledge, unacknowledge and delete alarms.  
 
-    Exemples:  
+Exemples:  
 
-    Acknowledges the (unacknowledged) alarms triggered in the last 3 days that mention "HTTP: SQL Injection Attempt Detected" in the triggered event name and destinated to 10.55.16.99 :
-    ```
-    $ msiem alarms --action acknowledge \
-    -t LAST_24_HOURS \
-    --status unacknowledged \
-    --filters "ruleName=HTTP: SQL Injection Attempt Detected" "destIp=10.55.16.99"
-    ```
+Acknowledges the (unacknowledged) alarms triggered in the last 
+3 days that mention "HTTP: SQL Injection Attempt Detected" in 
+the triggered event name and destinated to 10.55.16.99 :
 
-    Prints the alarms triggered in the last hour using the query module to retreive events informations and request for specific fields :
-    ```
-    $ msiem alarms -t LAST_HOUR \
-    --query_events \
-    --alarms_fields acknowledgedDate alarmName events \
-    --events_fields Alert.LastTime Rule.msg Alert.DstIP
-    ```"""
+        $ msiem alarms --action acknowledge \\
+        -t LAST_24_HOURS \\
+        --status unacknowledged \\
+        --filters \\
+            "ruleName=HTTP: SQL Injection Attempt Detected" \\
+            "destIp=10.55.16.99"
+
+Prints the alarms triggered in the last hour using the query 
+module to retreive events informations and request for 
+specific fields :
+
+        $ msiem alarms -t LAST_HOUR \\
+        --query_events \\
+        --alarms_fields acknowledgedDate alarmName events \\
+        --events_fields Alert.LastTime Rule.msg Alert.DstIP
+
+"""
 
     filters = [item for sublist in args.filters for item in sublist]
     event_filters = [item for sublist in args.event_filters for item in sublist]
@@ -219,8 +227,7 @@ def alarms_cmd(args):
 
 def esm_cmd(args):
     """
-    Show ESM version and misc informations regarding your ESM.  
-    """
+Show ESM version and misc informations regarding your ESM."""
     esm = ESM()
     vargs=vars(args)
     for k,v in vargs.items() :
@@ -229,55 +236,58 @@ def esm_cmd(args):
 
 def ds_cmd(args):
     """
-    Add datasources from CSV or INI files, list, search, remove.  
+Add datasources from CSV or INI files, list, search, remove.  
 
-    INI format: Single datasource per file.  
+INI format: Single datasource per file.  
 
-    ```ìni
-    [datasource]
-    # name of datasource (req)
-    name=testing_datasource
-    # ip of datasource (ip or hostname required)
-    ds_ip=10.10.1.34
-    # hostname of te new datasource
-    hostname=
-    # type of datasource (req)
-    type_id=65
-    # id of parent device (req)
-    parent_id=144116287587483648
-    # True value designate a client datasource 
-    client=
-    ```
+        
+        [datasource]
+        # name of datasource (req)
+        name=testing_datasource
+        # ip of datasource (ip or hostname required)
+        ds_ip=10.10.1.34
+        # hostname of te new datasource
+        hostname=
+        # type of datasource (req)
+        type_id=65
+        # id of parent device (req)
+        parent_id=144116287587483648
+        # True value designate a client datasource 
+        client=
 
-    CSV Format: Multiple datasources per file
 
-    ```csv
-    name,ds_ip,hostname,type_id,parent_id,client
-    Test DataSource 11,10.10.1.41,datasource11.domain.com,65,144116287587483648,
-    Test DataSource 12,10.10.1.42,datasource12.domain.com,65,144116287587483648,
-    Test DataSource 13,10.10.1.43,datasource13.domain.com,65,144116287587483648,
-    ```
+CSV Format: Multiple datasources per file
 
-    Add Datasources with: 
 
-    ```
-    msiem ds --add <file or folder>
-    ```"""
+        name,ds_ip,hostname,type_id,parent_id,client
+        Test DataSource 11,10.10.1.41,datasource11.domain.com,65,144116287587483648,
+        Test DataSource 12,10.10.1.42,datasource12.domain.com,65,144116287587483648,
+        Test DataSource 13,10.10.1.43,datasource13.domain.com,65,144116287587483648,
+
+
+Add Datasources with: 
+
+        $ msiem ds --add <file or folder>
+
+"""
     dstools(args)
 
 def events_cmd(args):
     """
-    Query events with filters, add note to events.  
-    
-    With simpler filter
-    ```
-    msiem events --filter DstIP=127.0.0.1 --field SrcIP DstIP   
-    ```
-    
-    Specific operatior and multiple values filter
-    ```
-    msiem events --filter SrcIP IN 22.0.0.0/8 10.0.0.0/8 --fields SrcIP DstIP
-    ```"""
+Query events with filters, add note to events.  
+
+With simpler filter:
+
+        $ msiem events --filter DstIP=127.0.0.1 --field SrcIP DstIP   
+
+
+Specific operatior and multiple values filter:
+
+        $ msiem events --filter \\
+            SrcIP IN 22.0.0.0/8 10.0.0.0/8 \\
+            --fields SrcIP DstIP
+
+"""
 
     filters = [item for sublist in args.filters for item in sublist if len(sublist)!=3]
 
@@ -304,23 +314,37 @@ def events_cmd(args):
 
 def wl_cmd(args):
     """
-    Watchlist operations. Not implemented yet. 
-    """
+Watchlist operations. Not implemented yet.
+
+"""
     pass
 
 def api_cmd(args):
     """
-    Quickly make API requests to any enpoints with any data.  
+Quickly make API requests to any enpoints with any data.  
 
-    Exemple
+Exemple:
 
-    ```
-    msiem api --method "v2/alarmGetTriggeredAlarms?triggeredTimeRange=LAST_24_HOURS&status=&pageSize=500&pageNumber=1" --data {}
-    ```"""
+$ msiem api --method \\
+    "v2/alarmGetTriggeredAlarms?triggeredTimeRange=LAST_24_HOURS&status=&pageSize=500&pageNumber=1" \\
+    --data {}
+
+"""
     
     s=NitroSession()
     s.login()
     if args.list:
+
+        help_page = etree.parse(BytesIO(requests.get('https://{esm_url}/rs/esm/v2/help'.format(esm_url=s.config.host), verify=s.config.ssl_verify).text.encode()))
+        endpoints = [e.get('name') for e in help_page.iter() if 'esmCommand' in e.tag and e.get('name')]
+
+        API_DOCS = ""
+        for endp in endpoints:
+            API_DOCS += "msiem api --method v2/{} --data <JSON string or file>\n".format(endp)
+        
+        print("All possible SIEM requests: ")
+        print(API_DOCS)
+
         PARAMS_DOCS = ""
         for k, v in s.PARAMS.items():
             name = "{}".format(k)
@@ -345,8 +369,10 @@ def api_cmd(args):
             PARAMS_DOCS += "msiem api --method '{}' {} # Call {}  \n".format(
                 name, '--args '+params if params else params, endpoint
             )
-        
+
+        print("Requests with API parameters interpolation")
         print(PARAMS_DOCS)
+
         exit(0)
 
     if args.method:

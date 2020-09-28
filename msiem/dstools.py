@@ -3,11 +3,9 @@
 
 """Add datasources from CSV or INI files, list, search, remove.  """
 
-import argparse
 import csv
 import os
 import sys
-import logging
 import time
 import traceback
 from configparser import ConfigParser, NoSectionError, MissingSectionHeaderError

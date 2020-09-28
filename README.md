@@ -1,4 +1,7 @@
-# McAfee SIEM Command Line Interface
+## McAfee SIEM Command Line Interface
+
+[![PyPI version](https://badge.fury.io/py/msiem.svg)](https://pypi.org/project/msiem/)
+[![Docs](https://img.shields.io/badge/-manpage-blue)](https://mfesiem.github.io/docs/msiem/index.html)
 
 ```
                 _                
@@ -10,7 +13,7 @@
  McAfee SIEM Command Line Interface
  ```
 
-Any contributions would be great.  
+
 
 Based on the work of [andywalen](https://github.com/andywalden) and the [McAfee SIEM API Python wrapper](https://github.com/mfesiem/msiempy)
 
@@ -20,13 +23,18 @@ Based on the work of [andywalen](https://github.com/andywalden) and the [McAfee 
 - Datasource operations: add, delete - including client datasources
 - Alarm operations and querying: filter, acknowledge, unacknowledge, delete
 - Event operations and querying: filter
-- Query any API endpoint with any data.
+- Query any ESM API endpoint with any data.
 
 ## Installation
 ```bash
 $ python3 -m pip install msiem --upgrade
 ```
 
-## Command Line Interface overview
-Read the [documentation](https://github.com/mfesiem/msiem/tree/master/doc) or use `msiem -h`.  
+## Command Line Interface documentation
+Read the [manpage](https://mfesiem.github.io/docs/msiem/) or use `msiem -h`.  
+
+#### TODO
+
+- Watchlist operations support
+- Add notes to events
 

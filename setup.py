@@ -21,16 +21,15 @@ setup(
     version=version['__version__'],
     packages=['msiem',],
     entry_points = {
-        'console_scripts': ['msiem=msiem.cli:main'],
+        'console_scripts': ['msiem=msiem._cli:main'],
     },
     install_requires=[
-          'msiempy'
+          'msiempy', 'requests', 'lxml'
     ],
     classifiers=[
         "Programming Language :: Python :: 3",
     ],
     license='The MIT License',
     long_description=README,
-    long_description_content_type="text/markdown",
-    test_suite="tests"
+    long_description_content_type="text/markdown"
 )
