@@ -21,7 +21,7 @@ setup(
     version=version['__version__'],
     packages=['msiem',],
     entry_points = {
-        'console_scripts': ['msiem=msiem._cli:main'],
+        'console_scripts': ['msiem=msiem.cli:main'],
     },
     install_requires=[
           'msiempy', 'requests', 'lxml'
