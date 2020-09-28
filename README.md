@@ -31,10 +31,7 @@ $ python3 -m pip install msiem --upgrade
 ```
 
 ## Command Line Interface documentation
-Read the [manpage](https://mfesiem.github.io/docs/msiem/) or use `msiem -h`.  
+**Read the [manpage](https://mfesiem.github.io/docs/msiem/)** or use `msiem -h`.  
 
-#### TODO
-
-- Watchlist operations support
-- Add notes to events
+#### More to come !
 
