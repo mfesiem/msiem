@@ -11,10 +11,10 @@ fi
 
 # Generating documentation
 argparse-manpage --pyfile ./msiem/cli.py --function get_parser --author "Andy Walden, Tristan Landes" --project-name "msiem" > msiem.1
-# echo > mfesiem.github.io/docs/msiem/index.html
-# pandoc -f man -t html msiem.1 -o mfesiem.github.io/docs/msiem/index.html
-# cp man.html
-cat msiem.1  | groff -mandoc -Thtml > mfesiem.github.io/docs/msiem/index.html
+echo '<pre><code><xmp>' > mfesiem.github.io/docs/msiem/index.html
+man ./msiem.1 -P cat | col -b >> mfesiem.github.io/docs/msiem/index.html
+echo '</xmp></code></pre>' >> mfesiem.github.io/docs/msiem/index.html
+
 
 # Pushing docs
 echo "Pushing manpage"
@@ -23,5 +23,5 @@ cd ..
 
 echo "Manpage at : https://mfesiem.github.io/docs/msiem/"
 
-rm -f msiem.1
+# rm -f msiem.1
 # rm -f man.html

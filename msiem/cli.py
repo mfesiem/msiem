@@ -5,6 +5,7 @@ CLI
 
 import argparse
 import json
+import sys
 from urllib.parse import urlparse
 from string import Template
 
@@ -79,7 +80,6 @@ Run 'msiem <command> --help' for more information about a sub-command.""".format
     alarm.add_argument('--no_events', help='Do not load the complete trigerring events informations.', action="store_true")
     alarm.add_argument('--query_events', help="Use the query module to retreive events, much more effcient. Event keys will be like 'Alert.SrcIP' instead of 'srcIp'", action="store_true")
 
-
     ### ESM ###
     esm_parser = commands.add_parser('esm', formatter_class=Formatter, help="Show ESM version and misc informations regarding your ESM.  ", description=esm_cmd.__doc__)
     esm_parser.set_defaults(func=esm_cmd)
@@ -121,21 +121,20 @@ Run 'msiem <command> --help' for more information about a sub-command.""".format
 
     ### API ###
     api_parser = commands.add_parser('api', formatter_class=Formatter, help="Quickly make API requests to any enpoints with any data.  ", description=api_cmd.__doc__)
-    api_parser.add_argument('-m','--method', metavar='<method>', help="SIEM API method name or NitroSession.PARAMS keyword. Exemple: 'v2/qryGetSelectFields' or 'get_possible_fields', see --list for full details .")
-    api_parser.add_argument('-d','--data', metavar='<JSON string or file>', help='POST data, in the case of a API method name call.  ', default={})
-    api_parser.add_argument('-a', '--args', metavar='<key>=<value>', help='NitroSession.PARAMS interpolation parameters, in the case of a NitroSession.PARAMS keyword call.  ', action='append', nargs='+', default=[[]])
-    api_parser.add_argument('-l', '--list', action='store_true', help='List all available SIEM API calls, and supported calls with keywords and parameter mapping requests. ' )
+    api_parser.add_argument('-m','--method', metavar='<method>', help="SIEM API method name or NitroSession.PARAMS keyword. Exemple: 'v2/qryGetSelectFields' or 'get_possible_fields', see 'msiem api --list' for full details .")
+    api_parser.add_argument('-d','--data', metavar='<JSON string or file>', help='POST data, in the case of a API method name call.  See the SIEM API docs for full details.  ', default={})
+    api_parser.add_argument('-a', '--args', metavar='<key>=<value>', help="Interpolation parameters, in the case of a NitroSession.PARAMS keyword call.  See 'msiem api --list' for full details.  ", action='append', nargs='+', default=[[]])
+    api_parser.add_argument('-l', '--list', action='store_true', help='List all available SIEM API calls as well as all supported calls with keywords and parameter mapping. ' )
 
     return parser
 
-def parse_args():
+def parse_msiem_cli_args():
     return (get_parser().parse_args())
 
 def config_cmd(args):
     """
 Set and print your msiempy config.  
-
-"""
+    """
 
     conf=NitroConfig() # ConfigParser object
 
@@ -166,23 +165,22 @@ Acknowledges the (unacknowledged) alarms triggered in the last
 3 days that mention "HTTP: SQL Injection Attempt Detected" in 
 the triggered event name and destinated to 10.55.16.99 :
 
-        $ msiem alarms --action acknowledge \\
-        -t LAST_24_HOURS \\
-        --status unacknowledged \\
-        --filters \\
-            "ruleName=HTTP: SQL Injection Attempt Detected" \\
-            "destIp=10.55.16.99"
+    $ msiem alarms --action acknowledge \\
+    -t LAST_24_HOURS \\
+    --status unacknowledged \\
+    --filters \\
+        "ruleName=HTTP: SQL Injection Attempt Detected" \\
+        "destIp=10.55.16.99"
 
 Prints the alarms triggered in the last hour using the query 
 module to retreive events informations and request for 
 specific fields :
 
-        $ msiem alarms -t LAST_HOUR \\
-        --query_events \\
-        --alarms_fields acknowledgedDate alarmName events \\
-        --events_fields Alert.LastTime Rule.msg Alert.DstIP
-
-"""
+    $ msiem alarms -t LAST_HOUR \\
+    --query_events \\
+    --alarms_fields acknowledgedDate alarmName events \\
+    --events_fields Alert.LastTime Rule.msg Alert.DstIP
+    """
 
     filters = [item for sublist in args.filters for item in sublist]
     event_filters = [item for sublist in args.event_filters for item in sublist]
@@ -241,35 +239,34 @@ Add datasources from CSV or INI files, list, search, remove.
 INI format: Single datasource per file.  
 
         
-        [datasource]
-        # name of datasource (req)
-        name=testing_datasource
-        # ip of datasource (ip or hostname required)
-        ds_ip=10.10.1.34
-        # hostname of te new datasource
-        hostname=
-        # type of datasource (req)
-        type_id=65
-        # id of parent device (req)
-        parent_id=144116287587483648
-        # True value designate a client datasource 
-        client=
+    [datasource]
+    # name of datasource (req)
+    name=testing_datasource
+    # ip of datasource (ip or hostname required)
+    ds_ip=10.10.1.34
+    # hostname of te new datasource
+    hostname=
+    # type of datasource (req)
+    type_id=65
+    # id of parent device (req)
+    parent_id=144116287587483648
+    # True value designate a client datasource 
+    client=
 
 
 CSV Format: Multiple datasources per file
 
 
-        name,ds_ip,hostname,type_id,parent_id,client
-        Test DataSource 11,10.10.1.41,datasource11.domain.com,65,144116287587483648,
-        Test DataSource 12,10.10.1.42,datasource12.domain.com,65,144116287587483648,
-        Test DataSource 13,10.10.1.43,datasource13.domain.com,65,144116287587483648,
+    name,ds_ip,hostname,type_id,parent_id,client
+    Test_ds_1,10.10.1.41,datasource11.domain.com,65,144116287587483648,
+    Test_ds_2,10.10.1.42,datasource12.domain.com,65,144116287587483648,
+    Test_ds_3,10.10.1.43,datasource13.domain.com,65,144116287587483648,
 
 
 Add Datasources with: 
 
         $ msiem ds --add <file or folder>
-
-"""
+    """
     dstools(args)
 
 def events_cmd(args):
@@ -278,16 +275,15 @@ Query events with filters, add note to events.
 
 With simpler filter:
 
-        $ msiem events --filter DstIP=127.0.0.1 --field SrcIP DstIP   
+    $ msiem events --filter DstIP=127.0.0.1 --field SrcIP DstIP   
 
 
 Specific operatior and multiple values filter:
 
-        $ msiem events --filter \\
-            SrcIP IN 22.0.0.0/8 10.0.0.0/8 \\
-            --fields SrcIP DstIP
-
-"""
+    $ msiem events --filter \\
+        SrcIP IN 22.0.0.0/8 10.0.0.0/8 \\
+        --fields SrcIP DstIP
+    """
 
     filters = [item for sublist in args.filters for item in sublist if len(sublist)!=3]
 
@@ -314,9 +310,8 @@ Specific operatior and multiple values filter:
 
 def wl_cmd(args):
     """
-Watchlist operations. Not implemented yet.
-
-"""
+Watchlist operations. Not implemented yet.  
+    """
     pass
 
 def api_cmd(args):
@@ -327,9 +322,8 @@ Exemple:
 
 $ msiem api --method \\
     "v2/alarmGetTriggeredAlarms?triggeredTimeRange=LAST_24_HOURS&status=&pageSize=500&pageNumber=1" \\
-    --data {}
-
-"""
+    --data {}   
+    """
     
     s=NitroSession()
     s.login()
@@ -405,7 +399,7 @@ def print_version_and_exit():
 def main():
     
     try:
-        args = parse_args()
+        args = parse_msiem_cli_args()
 
         if args.command == 'config' :
             config_cmd(args)
