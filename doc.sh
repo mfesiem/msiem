@@ -10,6 +10,8 @@ else
 fi
 
 # Generating documentation
+MANWIDTH=120
+export MANWIDTH
 argparse-manpage --pyfile ./msiem/cli.py --function get_parser --author "Andy Walden, Tristan Landes" --project-name "msiem" > msiem.1
 echo '<pre><code><xmp>' > mfesiem.github.io/docs/msiem/index.html
 man ./msiem.1 -P cat | col -b >> mfesiem.github.io/docs/msiem/index.html
