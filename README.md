@@ -1,5 +1,6 @@
 ## McAfee SIEM Command Line Interface
 
+[![Tests](https://github.com/mfesiem/msiem/workflows/test/badge.svg)](https://github.com/mfesiem/msiem/actions)
 [![PyPI version](https://badge.fury.io/py/msiem.svg)](https://pypi.org/project/msiem/)
 [![Docs](https://img.shields.io/badge/-manpage-blue)](https://mfesiem.github.io/docs/msiem/index.html)
 
@@ -11,11 +12,11 @@
  |_| |_| |_|___|_|\___|_| |_| |_| CLI
      
  McAfee SIEM Command Line Interface
- ```
+```
 
+Most of the core `msiempy` features accessible with CLI.  
 
-
-Based on the work of [andywalen](https://github.com/andywalden) and the [McAfee SIEM API Python wrapper](https://github.com/mfesiem/msiempy)
+Based on the work of [andywalen](https://github.com/andywalden).  
 
 ## Features
 
