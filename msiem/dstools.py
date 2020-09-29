@@ -67,7 +67,9 @@ def convert_ds_files(files):
         filenames (list): list of filenames to convert         
    
     Returns:
-        list of dicts - each represents a single datasource config            
+        list of dicts - each represents a single datasource config           
+
+    TODO: write a test 
     """
     ds_lods = []
     for file in files:
@@ -94,15 +96,10 @@ def csv_to_dict(file):
         types (dict): {type_id: file_str}
     Returns:
         list of lists from the CSV file or None on failure
-        
-    Raises:
-        ValueError: if 3col datasource file detected without ini types
     """
     csv_lol = csv_to_lol(file)
     
     if not csv_lol:
-        ds_dicts = None
-    elif len(csv_lol[0]) < 3:
         ds_dicts = None
     else:
         ds_dicts = process_export_csv(csv_lol)   
@@ -145,34 +142,10 @@ def ini_to_dict(filename, subdict):
         instead of flat {k1:v1, k2:v2}
         
     """
-    ini_dict = _ini_to_dict(filename)
-    
-    try:
-        return ini_dict.get(subdict)
-    except AttributeError:
-        pass
-    
-def _ini_to_dict(filename):
-    """
-    Returns:
-        dict containing values of ini file or None if file is not valid
-    """
-    class INI_Parser(ConfigParser):
-        def get_ini_dict(self):
-            ini_dict = dict(self._sections)
-            for key in ini_dict:
-                ini_dict[key] = dict(self._defaults, **ini_dict[key])
-                ini_dict[key].pop('__name__', None)
-            return ini_dict
-    parser = INI_Parser()
-
-    try:
-        with open(filename, 'r') as open_f:
-            parser.read_file(open_f)
-            return parser.get_ini_dict()
-    except (OSError, PermissionError, UnicodeDecodeError,
-            MissingSectionHeaderError, NoSectionError):
-        pass
+    c=ConfigParser()
+    c.read(filename)
+    ini_dict = c._sections
+    return ini_dict.get(subdict)
 
 def csv_to_lol(file):
     """
