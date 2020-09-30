@@ -24,7 +24,7 @@ setup(
         'console_scripts': ['msiem=msiem.cli:main'],
     },
     install_requires=[
-          'msiempy', 'requests', 'lxml'
+          'msiempy>=0.3.3', 'requests', 'lxml'
     ],
     classifiers=[
         "Programming Language :: Python :: 3",

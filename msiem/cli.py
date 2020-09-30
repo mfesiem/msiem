@@ -326,8 +326,8 @@ def events_cmd(args):
     Save the results to a JSON file.  
 
         $ msiem events --filter SrcIP IN 22.0.0.0/8 10.0.0.0/8 \\
-            --filter SigID EQUALS 4294967295 \\
-            --fields SrcIP DstIP Rule.msg SigID \\
+            --filter DSIDSigID IN 49190-4294967295 \\
+            --fields SrcIP DstIP Rule.msg DSIDSigID \\
             --json > events.json
     """
 

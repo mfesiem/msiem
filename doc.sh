@@ -12,6 +12,7 @@ fi
 # Generating documentation
 MANWIDTH=120
 export MANWIDTH
+rm -f msiem.1
 argparse-manpage --pyfile ./msiem/cli.py --function get_parser --author "Andy Walden, Tristan Landes" --project-name "msiem" > msiem.1
 echo '<pre><code><xmp>' > mfesiem.github.io/docs/msiem/index.html
 man ./msiem.1 -P cat | col -b >> mfesiem.github.io/docs/msiem/index.html
@@ -24,6 +25,3 @@ cd mfesiem.github.io && git add . && git commit -m "Generate msiem docs $(date)"
 cd ..
 
 echo "Manpage at : https://mfesiem.github.io/docs/msiem/"
-
-# rm -f msiem.1
-# rm -f man.html

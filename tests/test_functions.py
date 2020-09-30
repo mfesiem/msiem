@@ -37,26 +37,26 @@ class T(unittest.TestCase):
 
     
     def test_events_cmd_parse_filters(self):
-        args = [    [   "DestIP=10.55.16.99", 
+        args = [    [   "DstIP=10.55.16.99", 
                         "SrcIP=10.0.0.0/8", 
                         "Rule.msg=HTTP: SQL Injection Attempt Detected", 
                         "severity=90"],
                     ["HostID=hello=@1234.com",],
                     ["HostID", "REGEX", ".*"],
-                    ["DestIP", "NOT_IN", "22.0.0.0/8", "55.0.0.0/8"]
+                    ["DstIP", "NOT_IN", "22.0.0.0/8", "55.0.0.0/8"]
                 ]
         excepted = [
-            ("DestIP", "10.55.16.99"),
+            ("DstIP", "10.55.16.99"),
             ("SrcIP", "10.0.0.0/8"),
             ("Rule.msg", "HTTP: SQL Injection Attempt Detected"),
             ("severity", "90"),
             ("HostID", "hello=@1234.com"),
             GroupFilter([
                 FieldFilter(name="HostID", values=[".*"], operator='REGEX'),
-                FieldFilter(name="DestIP", values=["22.0.0.0/8", "55.0.0.0/8"], operator='NOT_IN'),
+                FieldFilter(name="DstIP", values=["22.0.0.0/8", "55.0.0.0/8"], operator='NOT_IN'),
                 ], logic='AND')
         ]
-
+        print(events_cmd_parse_filters(args))
         self.assertEqual(events_cmd_parse_filters(args), excepted, msg="Events --filters parsing is broken")
 
         with self.assertRaises(ValueError, msg="Events --filters parsing do not raise execption when passing invalid filter"):
