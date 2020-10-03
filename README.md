@@ -14,7 +14,7 @@
  McAfee SIEM Command Line Interface
 ```
 
-Most of the core `[msiempy](https://github.com/mfesiem/msiempy)` features accessible with CLI.  
+Most of the core [`msiempy`](https://github.com/mfesiem/msiempy) features accessible with CLI.  
 
 Based on the work of [andywalen](https://github.com/andywalden).  
 
