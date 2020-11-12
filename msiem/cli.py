@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-CLI
+msiem CLI
 """
 
 import argparse
@@ -15,7 +15,20 @@ from lxml import etree
 from io import BytesIO
 
 from msiempy.core.utils import tob64
-from msiempy import FilteredQueryList, NitroConfig, AlarmManager, Alarm, EventManager, FieldFilter, GroupFilter, Event, ESM, NitroSession
+from msiempy import ( 
+    FilteredQueryList, 
+    NitroConfig, 
+    AlarmManager, 
+    Alarm, 
+    EventManager, 
+    FieldFilter, 
+    GroupFilter, 
+    Event, 
+    ESM, 
+    NitroSession, 
+    WatchlistManager, 
+    Watchlist 
+)
 
 from msiem.__version__ import __version__
 from msiem.__pathutils__ import is_path_exists_or_creatable
@@ -28,7 +41,8 @@ class Formatter(argparse.ArgumentDefaultsHelpFormatter, argparse.RawDescriptionH
 
 DEFAULT_ALARM_FIELDS=['alarmName','triggeredDate', 'acknowledgedDate', 'events']
 DEFAULT_EVENT_FIELDS=['ruleName', 'srcIp', 'destIp' ]
-DEFAULT_EVENT_FIELDS_QUERY=['Rule.msg', 'Alert.SrcIP', 'Alert.DstIP' ]
+DEFAULT_EVENT_FIELDS_NOTIF_DETAIL=['ruleMessage', 'sourceIp', 'destIp' ]
+DEFAULT_EVENT_FIELDS_QUERY=['Rule.msg', 'SrcIP', 'DstIP' ]
 
 def pprint_json(obj):
     print(json.dumps(obj, indent=2))
@@ -39,7 +53,7 @@ def get_parser():
 License: MIT 
 Credits: Andy Walden, Tristan Landes  
 
-Run 'msiem <command> --help' for more information about a sub-command.""".format(
+Run `msiem <command> --help` for more information about a sub-command.""".format(
         msiem_version=__version__,),
         prog='msiem',
         formatter_class=Formatter,)
@@ -50,39 +64,35 @@ Run 'msiem <command> --help' for more information about a sub-command.""".format
     parser.add_argument('-V', '--version', help="Show version and exit", action="store_true")   
     
     ### CONFIG ###
-    config = commands.add_parser('config', formatter_class=Formatter, help="Set and print your msiempy config.  ", description=config_cmd.__doc__)
-    config.set_defaults(func=config_cmd)
-    config.add_argument('--print', help="Print configuration fields, password base 64 is replaced with '***'. ", action="store_true")
-    config.add_argument('--set', metavar="'<section>' ['<option>' '<value>']", help="Set the config option to the specified value if passed (can be repeated), OR inveractively prompt for specified configuration section: 'esm' or 'general'.", action='append', nargs='+', default=[])
-
+    config_parser = commands.add_parser('config', formatter_class=Formatter, help="Set and print your msiempy config.  ", description=config_cmd.__doc__)
+    config_parser.add_argument('--print', help="Print configuration fields, password base 64 truncated from the output. ", action="store_true")
+    config_parser.add_argument('--set', metavar="'<section>' ['<option>' '<value>']", help="Set the config option to the specified value if passed (can be repeated), OR inveractively prompt for specified configuration section: 'esm' or 'general'.", action='append', nargs='+', default=[])
 
     ### ALARMS ###
-    alarm = commands.add_parser('alarms', formatter_class=Formatter, help="Query alarms with alarms and events based regex filters. Print, acknowledge, unacknowledge and delete alarms.  ", description=alarms_cmd.__doc__)
-    alarm.set_defaults(func=alarms_cmd)
-    alarm.add_argument('--action', metavar="action", help="What to do with the alarms, if not specified will print only. Chose from 'acknowledge','unacknowledge','delete'", 
+    alarms_parser = commands.add_parser('alarms', formatter_class=Formatter, help="Query alarms with alarms and events based regex filters. Print, acknowledge, unacknowledge and delete alarms.  ", description=alarms_cmd.__doc__)
+    alarms_parser.add_argument('--action', metavar="action", help="What to do with the alarms, if not specified will print only. Chose from 'acknowledge','unacknowledge','delete'", 
         choices=['acknowledge','unacknowledge','delete'])
-    alarm.add_argument('--force', help="Will not prompt for confirmation to do the specified action", action="store_true")
-    alarm.add_argument('--time_range','-t', metavar='time_range', help='Timerange, choose from '+', '.join(FilteredQueryList.POSSIBLE_TIME_RANGE),  
+    alarms_parser.add_argument('--force', help="Will not prompt for confirmation to do the specified action", action="store_true")
+    alarms_parser.add_argument('--time_range','-t', metavar='time_range', help='Timerange, choose from '+', '.join(FilteredQueryList.POSSIBLE_TIME_RANGE),  
         choices=FilteredQueryList.POSSIBLE_TIME_RANGE, default='CURRENT_DAY')
-    alarm.add_argument('--start_time','--t1', metavar='time', help='Start trigger date')
-    alarm.add_argument('--end_time','--t2', metavar='time', help='End trigger date')
-    alarm.add_argument('--status', metavar='status', help="Status of the alarm. Chose from 'acknowledged','unacknowledged','all'",choices=['acknowledged','unacknowledged','all'], default='all')
-    alarm.add_argument('--filters', '-f', metavar="'<field>=<regex>'", action='append', nargs='+', help="""List of alarm related field/matchvalue filters. Repeatable. 
+    alarms_parser.add_argument('--start_time','--t1', metavar='time', help='Start trigger date')
+    alarms_parser.add_argument('--end_time','--t2', metavar='time', help='End trigger date')
+    alarms_parser.add_argument('--status', metavar='status', help="Status of the alarm. Chose from 'acknowledged','unacknowledged','all'",choices=['acknowledged','unacknowledged','all'], default='all')
+    alarms_parser.add_argument('--filters', '-f', metavar="'<field>=<regex>'", action='append', nargs='+', help="""List of alarm related field/matchvalue filters. Repeatable. 
     Alarm related fields can be : id, summary, assignee, severity, triggeredDate, acknowledgedDate, acknowledgedUsername, alarmName, events, and others""", default=[[]])
-    alarm.add_argument('--event_filters', '-e', metavar="'<field>=<regex>'", action='append', nargs='+', help="""List of triggering event related field/matchvalue filters. Repeatable.
+    alarms_parser.add_argument('--event_filters', '-e', metavar="'<field>=<regex>'", action='append', nargs='+', help="""List of triggering event related field/matchvalue filters. Repeatable.
     Event related fields can be : ruleName, srcIp, destIp, protocol, lastTime, subtype, destPort, destMac, srcMac, srcPort, deviceName, sigId, normId, srcUser, destUser, normMessage, normDesc, host, domain, ipsId, etc...
     Or (if --query_events) : Rule.msg, Alert.SrcPort, Alert.DstPort, Alert.SrcIP, Alert.DstIP, Alert.SrcMac, Alert.DstMac, Alert.LastTime, Rule.NormID, Alert.DSIDSigID, Alert.IPSIDAlertID, etc...""", default=[[]])
-    alarm.add_argument('--alarms_fields', metavar="list of fields", nargs='+', help="List of fields that appear in the alarm table. Overwritten by --json", default=DEFAULT_ALARM_FIELDS)
-    alarm.add_argument('--events_fields', metavar="list of fields", nargs='+', help="List of fields that appear in the events sub tables. Default value: {}. If you use --query_events, this list will be used to query needed values, you must specify all fields you want to filter on with ewvent_filters. Default value if --query_events: {}. Overwritten by --json.".format(DEFAULT_EVENT_FIELDS, DEFAULT_EVENT_FIELDS_QUERY), default=None)
-    alarm.add_argument('--json', action='store_true', help="Prints the raw json object with all loaded fields")
-    alarm.add_argument('--page_size', '-p', metavar='page_size', help='Size of requests', default=500, type=int)
-    alarm.add_argument('--pages', '-n', metavar='pages', help='Number of alarm pages to load', default=1, type=int)
-    alarm.add_argument('--no_events', help='Do not load the complete trigerring events informations. On SIEM v11.x, still load the events infos from notifyGetTriggeredNotification. (Else events field is a string).  ', action="store_true")
-    alarm.add_argument('--query_events', help="Use the query module to retreive events, much more effcient. Event keys will be like 'Alert.SrcIP' instead of 'srcIp'", action="store_true")
+    alarms_parser.add_argument('--alarms_fields', metavar="list of fields", nargs='+', help="List of fields that appear in the alarm table. Overwritten by --json", default=DEFAULT_ALARM_FIELDS)
+    alarms_parser.add_argument('--events_fields', metavar="list of fields", nargs='+', help="List of fields that appear in the events sub tables. Default value: {}. If you use --query_events, this list will be used to query needed values, you must specify all fields you want to filter on with ewvent_filters. Default value if --query_events: {}. Overwritten by --json.".format(DEFAULT_EVENT_FIELDS, DEFAULT_EVENT_FIELDS_QUERY), default=None)
+    alarms_parser.add_argument('--json', action='store_true', help="Prints only a JSON object to STDOUT output.  ")
+    alarms_parser.add_argument('--page_size', '-p', metavar='page_size', help='Size of requests', default=500, type=int)
+    alarms_parser.add_argument('--pages', '-n', metavar='pages', help='Number of alarm pages to load', default=1, type=int)
+    alarms_parser.add_argument('--no_events', help='Do not load the complete trigerring events informations. On SIEM v11.x, still load the events infos from notifyGetTriggeredNotification. (Else events field is a string).  ', action="store_true")
+    alarms_parser.add_argument('--query_events', help="Use the query module to retreive events, much more effcient. Event keys will be like 'Alert.SrcIP' instead of 'srcIp'", action="store_true")
 
     ### ESM ###
     esm_parser = commands.add_parser('esm', formatter_class=Formatter, help="Show ESM version and misc informations regarding your ESM.  ", description=esm_cmd.__doc__)
-    esm_parser.set_defaults(func=esm_cmd)
     esm_parser.add_argument('--version', help='Show ESM version', action="store_true")
     esm_parser.add_argument('--time', help='time (GMT)', action="store_true")
     esm_parser.add_argument('--disks', help='disk status', action="store_true")
@@ -101,29 +111,49 @@ Run 'msiem <command> --help' for more information about a sub-command.""".format
                                    'May require quotes around the name if there'
                                    'are spaces.')
     ds_parser.add_argument( '-l', '--list', action="store_true" ,help='Display datasources.')
-    ds_parser.add_argument( '--delete', metavar='<datasource ID>', help='Deletes the datasource and all the data. Be careful.', nargs='+')
+    ds_parser.add_argument( '--delete', '--remove', metavar='<datasource ID>', help='Deletes the datasource and all the data. Be careful.', nargs='+')
     ds_parser.add_argument( '--deleteclients', metavar='<datasource ID>', help="Deletes the datasource's clients and all the data. Be careful.", nargs='+')
     ds_parser.add_argument( '--force', action='store_true', help="Do not ask the user input before deletion of the datasources / datasources client.")
 
 
     ### EVENTS 
     events_parser = commands.add_parser('events', formatter_class=Formatter, help="Query events with any simple filter. Add a note to events.  ", description=events_cmd.__doc__)
+    
     events_parser.add_argument('--time_range','-t', metavar='time_range', help='Timerange, choose from '+', '.join(FilteredQueryList.POSSIBLE_TIME_RANGE),  
         choices=FilteredQueryList.POSSIBLE_TIME_RANGE, default='CURRENT_DAY')
-    events_parser.add_argument('--start_time','--t1', metavar='time', help='Start trigger date')
-    events_parser.add_argument('--end_time','--t2', metavar='time', help='End trigger date')
+    events_parser.add_argument('--start_time','--t1', metavar='<time>', help='Start trigger date')
+    events_parser.add_argument('--end_time','--t2', metavar='<time>', help='End trigger date')
     events_parser.add_argument('--filters', '-f', metavar="<filter>", action='append', nargs='+', help="""List of Event field/value filters: '<field>=<value>' or '<field>' '<operator>' '<value1>' '<value2>...'. Repeatable. Will generate only EsmBasicValue filters.   
     Filter fields can be: Rule.msg, Alert.SrcPort, Alert.DstPort, Alert.SrcIP, Alert.DstIP, Alert.SrcMac, Alert.DstMac, Alert.LastTime, Rule.NormID, Alert.DSIDSigID, Alert.IPSIDAlertID, etc...""", default=[[]])
     events_parser.add_argument('--fields', metavar="<field>", nargs='+', help="List of fields that appear in the events table. Default value: {}. ".format(DEFAULT_EVENT_FIELDS_QUERY), default=None)
-    events_parser.add_argument('--json', action='store_true', help="Prints the raw json object with all loaded fields")
-    events_parser.add_argument('--limit', metavar='limit', help='Size of requests', default=500, type=int)
+    events_parser.add_argument('--json', action='store_true', help="Prints only a JSON object to STDOUT output.  ")
+    events_parser.add_argument('--limit', metavar='<int>', help='Size of requests', default=500, type=int)
+    
+    events_parser.add_argument('--max', '--max_query_depth', metavar='<int>', help='Maximum number of reccursive time based divisions the loading process can apply to the query in order to load all events', default=0, type=int)
+    events_parser.add_argument('--grouped', action='store_true', help='Indicate a grouped events query, a IPSID filter must be provided and only one field value is accepted. ')
+    events_parser.add_argument('--add_note', metavar='<file or text>', help="Add a note to the events matching the filters. ")
+    events_parser.add_argument('--listfields', action='store_true', help="List all possible fields names")
+    events_parser.add_argument('--listfilters', action='store_true', help="List all possible fields names usable in filters")
+
+    ### WATCHLIST ###
+    wl_parser = commands.add_parser('wl', formatter_class=Formatter, help="Manage watchlists. Export, import values.  ", description=wl_cmd.__doc__)
+    wl_parser.add_argument('-l', '--list', action='store_true', help='List the ESM watchlists and exit. ')
+    wl_parser.add_argument('-t', '--types', action='store_true', help='List all possible watchlists types and exit. ')
+    wl_parser.add_argument('-e', '--values', metavar='<wl_name>', help='List watchlist values and exit. Redirect STDOUT to file to export data.  ',)
+    
+    wl_parser.add_argument('--add', metavar='<wl_name> <wl_type>', help='NotImplemented. Create a static watchlist.', nargs=2)
+    wl_parser.add_argument('--delete', '--remove', metavar='<wl ID>', help="NotImplemented. Deletes a Watchlist", nargs=1)
+    wl_parser.add_argument('-a', '--addvalues', metavar='<wl_name> <file or values>...', help='NotImplemented. Add values to a static watchlist. ', nargs='+')
+    wl_parser.add_argument('--rmvalues', metavar='<wl_name> <file or values>...', help='NotImplemented. Remove watchlist values from the watchlist. ', nargs='+')
+    
+    wl_parser.add_argument('--json', action='store_true', help="NotImplemented. Prints only a JSON object to STDOUT output.  ")
 
     ### API ###
     api_parser = commands.add_parser('api', formatter_class=Formatter, help="Quickly make API requests to any enpoints with any data.  ", description=api_cmd.__doc__)
     api_parser.add_argument('-m','--method', metavar='<method>', help="SIEM API method name or NitroSession.PARAMS keyword. Exemple: 'v2/qryGetSelectFields' or 'get_possible_fields', see 'msiem api --list' for full details .")
     api_parser.add_argument('-d','--data', metavar='<JSON string or file>', help='POST data, in the case of a API method name call.  See the SIEM API docs for full details.  ', default={})
     api_parser.add_argument('-a', '--args', metavar='<key>=<value>', help="Interpolation parameters, in the case of a NitroSession.PARAMS keyword call.  See 'msiem api --list' for full details.  ", action='append', nargs='+', default=[[]])
-    api_parser.add_argument('-l', '--list', action='store_true', help='List all available SIEM API calls as well as all supported calls with keywords and parameter mapping. ' )
+    api_parser.add_argument('-l', '--list', action='store_true', help='List all available SIEM API calls as well as all supported calls with keywords and parameter mapping. All upper cases method names signals to use the private API methods. ' )
 
     return parser
 
@@ -132,19 +162,19 @@ def parse_msiem_cli_args():
 
 def config_cmd(args):
     """
-    Set and print your msiempy config.  
+Set and print your msiempy config.  
 
-    Set your ESM hostname/user/password interactively:
+Set your ESM hostname/user/password interactively:
 
-        $ msiem confi --set esm
+    $ msiem confi --set esm
 
-    Set the general config verbose/quiet/logfile/timeout/ssl_verify interactively:
+Set the general config verbose/quiet/logfile/timeout/ssl_verify interactively:
 
-        $ msiem config --set general
+    $ msiem config --set general
 
-    Enable quiet mode (no infos or warnings):
+Enable quiet mode (no infos or warnings):
 
-        $ msiem config --set general quiet true --set general verbose false
+    $ msiem config --set general quiet true --set general verbose false
     """
 
     conf=NitroConfig() # ConfigParser object
@@ -187,25 +217,20 @@ def alarms_cmd_parse_filters(filters_args):
 
 def alarms_cmd(args):
     """
-    Query alarms with alarms and events based regex filters.  
-    Print, acknowledge, unacknowledge and delete alarms.  
+Query alarms with alarms and events based regex filters.  
+Print, acknowledge, unacknowledge and delete alarms.  
 
-    Exemples:  
+Exemples:  
 
-    Acknowledges the (unacknowledged) alarms triggered in the last 
-    3 days that mention "HTTP: SQL Injection Attempt Detected" in 
-    the triggered event name and destinated to 10.55.16.99 :
+Acknowledges the (unacknowledged) alarms triggered in the last 
+3 days that mention "HTTP: SQL Injection Attempt Detected" in 
+the triggered event name and destinated to 10.55.16.99 :
 
-        $ msiem alarms --action acknowledge \\
-            -t LAST_24_HOURS \\
-            --status unacknowledged \\
-            --filters \\
-                "ruleName=HTTP: SQL Injection Attempt Detected" \\
-                "destIp=10.55.16.99"
+    $ msiem alarms --action acknowledge -t LAST_24_HOURS --status unacknowledged --filters "ruleName=HTTP: SQL Injection Attempt Detected" "destIp=10.55.16.99"
 
-    Save the current day alarms as JSON file:
+Save the current day alarms as JSON:
 
-        $ msiem alarms -t CURRENT_DAY --no_events --json > alarms.json
+    $ msiem alarms -t CURRENT_DAY --no_events --json
 
     """
 
@@ -248,7 +273,7 @@ def alarms_cmd(args):
 
 def esm_cmd(args):
     """
-    Show ESM version and misc informations regarding your ESM.
+Show ESM version and misc informations regarding your ESM.
     """
     esm = ESM()
     vargs=vars(args)
@@ -258,34 +283,34 @@ def esm_cmd(args):
 
 def ds_cmd(args):
     """
-    Add datasources from CSV or INI files, list, search, remove.  
+Add datasources from CSV or INI files, list, search, remove.  
 
-    INI format: Single datasource per file.  
+INI format: Single datasource per file.  
             
-        [datasource]
-        # name of datasource (req)
-        name=testing_datasource
-        # ip of datasource (ip or hostname required)
-        ds_ip=10.10.1.34
-        # hostname of te new datasource
-        hostname=
-        # type of datasource (req)
-        type_id=65
-        # id of parent device (req)
-        parent_id=144116287587483648
-        # True value designate a client datasource 
-        client=
+    [datasource]
+    # name of datasource (required)
+    name=testing_datasource
+    # ip of datasource (ip or hostname required)
+    ds_ip=10.10.1.34
+    # hostname of te new datasource
+    hostname=
+    # type of datasource (required)
+    type_id=65
+    # id of parent device (required)
+    parent_id=144116287587483648
+    # True value designate a client datasource 
+    client=
 
-    CSV Format: Multiple datasources per file
+CSV Format: Multiple datasources per file
 
-        name,ds_ip,hostname,type_id,parent_id,client
-        Test_ds_1,10.10.1.41,datasource11.domain.com,65,144116287587483648,
-        Test_ds_2,10.10.1.42,datasource12.domain.com,65,144116287587483648,
-        Test_ds_3,10.10.1.43,datasource13.domain.com,65,144116287587483648,
+    name,ds_ip,hostname,type_id,parent_id,client
+    Test_ds_1,10.10.1.41,datasource11.domain.com,65,144116287587483648,
+    Test_ds_2,10.10.1.42,datasource12.domain.com,65,144116287587483648,
+    Test_ds_3,10.10.1.43,datasource13.domain.com,65,144116287587483648,
 
-    Add Datasources with: 
+Add Datasources with: 
 
-        $ msiem ds --add <file or folder>
+    $ msiem ds --add "File or folder"
     """
     dstools(args)
 
@@ -316,19 +341,16 @@ def events_cmd_parse_filters(filters_args):
 
 def events_cmd(args):
     """
-    Query events with filters, add note to events.  
+Query events with filters, add note to events.  
 
-    With simple filters:
+With simple filters:
 
-        $ msiem events --filters DstIP=127.0.0.1 SrcIP=22.0.0.0/8 --fields SrcIP DstIP   
+    $ msiem events --filters DstIP=127.0.0.1 SrcIP=22.0.0.0/8 --fields SrcIP DstIP   
 
-    Query events with pecific operatior and multiple values filters (filters are ANDed together inside a group filter). 
-    Save the results to a JSON file.  
+Query events with pecific operatior and multiple values filters (filters are ANDed together inside a group filter). 
+Print the results as JSON.  
 
-        $ msiem events --filter SrcIP IN 22.0.0.0/8 10.0.0.0/8 \\
-            --filter DSIDSigID IN 49190-4294967295 \\
-            --fields SrcIP DstIP Rule.msg DSIDSigID \\
-            --json > events.json
+    $ msiem events --filter SrcIP IN 22.0.0.0/8 10.0.0.0/8 --filter DSIDSigID IN 49190-4294967295 --fields SrcIP DstIP Rule.msg DSIDSigID --json
     """
 
     # Parse the list of lists passed as args
@@ -353,9 +375,57 @@ def events_cmd(args):
 
 def wl_cmd(args):
     """
-    Watchlist operations. Not implemented yet.  
+Watchlist operations. 
     """
-    pass
+    all_watchlists = WatchlistManager()
+        
+    if args.list:
+        if args.json:
+            print(all_watchlists.json)
+        else: 
+            print(all_watchlists.get_text(fields=['name','type','valueCount','active','source','id']))
+        exit(0)
+    
+    if args.types:
+        if args.json:
+            pprint_json(all_watchlists.get_wl_types())
+        else:
+            print("All Watchlist types: ")
+            print('\n'.join([ t['name'] for t in all_watchlists.get_wl_types() ]) )
+        exit(0)
+
+    if args.values:
+        my_wl = [ w for w in all_watchlists if w['name'] == args.values]
+        if not len(my_wl):
+            raise ValueError("Watchlist not found")
+        else:
+            my_wl=my_wl[0]
+        my_wl.load_values()
+        if args.json:
+            pprint_json(my_wl['values'])
+        else:
+            print("Watchlist '{}' values: ".format(my_wl['name']))
+            print('\n'.join(my_wl['values']))
+        exit(0)
+    
+    if args.addvalues:
+        my_wl = [ w for w in all_watchlists if w['name'] == args.addvalues[0]]
+        if not len(my_wl):
+            raise ValueError("Watchlist not found")
+        else:
+            my_wl=my_wl[0]
+        
+        my_wl.add_values()
+        raise NotImplementedError()
+
+    if args.add:
+        raise NotImplementedError()
+    if args.delete:
+        raise NotImplementedError()
+    if args.rmvalues:
+        raise NotImplementedError()
+    if args.json:
+        raise NotImplementedError()
 
 def api_cmd_get_api_docs():
     """
@@ -437,12 +507,11 @@ def api_cmd_get_data(args_data):
 
 def api_cmd(args):
     """
-    Quickly make API requests to any enpoints with any data. Print resposne to sdtout as JSON.   
+Quickly make API requests to any enpoints with any data. Print resposne to sdtout as JSON.   
 
-    Request v2/alarmGetTriggeredAlarms:  
+Request v2/alarmGetTriggeredAlarms:  
 
-        $ msiem api --method \\
-            "v2/alarmGetTriggeredAlarms?triggeredTimeRange=LAST_24_HOURS&status=&pageSize=500&pageNumber=1"
+    $ msiem api --method "v2/alarmGetTriggeredAlarms?triggeredTimeRange=LAST_24_HOURS&status=&pageSize=500&pageNumber=1"
 
     """
     
@@ -468,7 +537,6 @@ def api_cmd(args):
             res = s.api_request(args.method, api_cmd_get_data(args.data))
 
         pprint_json(res)
-
 
 def print_version_and_exit():
     print('msiem {}'.format(__version__))
