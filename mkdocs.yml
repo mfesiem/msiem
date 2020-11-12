@@ -1,0 +1,8 @@
+site_name: msiem CLI manpage
+site_description: msiem CLI manpage
+repo_url: https://github.com/mfesiem/msiem
+repo_name: GitHub
+markdown_extensions:
+    - toc:
+        permalink: True
+        separator: "_"
