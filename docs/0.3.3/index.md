@@ -1,4 +1,4 @@
-# msiem 0.3.4.dev0
+# msiem 3.3.0
 
 Manual
 
@@ -16,11 +16,10 @@ msiem [-h] [-V] {config,alarms,esm,ds,events,wl,api} ...
 
 # Description
 
-McAfee SIEM Command Line Interface 0.3.4dev.
-Most of the core msiempy features accessible with CLI.    
+McAfee SIEM Command Line Interface 0.3.4dev  
 
-License: MIT. 
-Credits: Andy Walden, Tristan Landes.
+License: MIT 
+Credits: Andy Walden, Tristan Landes  
 
 Run \`msiem &lt;command&gt; --help\` for more information about a sub-command.
 
@@ -312,48 +311,6 @@ Print the results as JSON.
   
 * **--listfilters**  
   List all possible fields names usable in filters
-  
-
-<a name="options-msiem-wl"></a>
-
-# Options 'msiem wl'
-
-usage: msiem wl [-h] [-l] [-t] [-e &lt;wl_name&gt;]
-                [--add &lt;wl_name&gt; &lt;wl_type&gt; &lt;wl_name&gt; &lt;wl_type&gt;]
-                [--delete &lt;wl ID&gt;]
-                [-a &lt;wl_name&gt; &lt;file or values&gt;... [&lt;wl_name&gt; &lt;file or values&gt;... ...]]
-                [--rmvalues &lt;wl_name&gt; &lt;file or values&gt;... [&lt;wl_name&gt; &lt;file or values&gt;... ...]]
-                [--json]
-
-Watchlist operations. 
-    
-
-
-
-* **-l**, **--list**  
-  List the ESM watchlists and exit. 
-  
-* **-t**, **--types**  
-  List all possible watchlists types and exit. 
-  
-* **-e** &lt;wl_name&gt;, **--values** &lt;wl_name&gt;  
-  List watchlist values and exit. Redirect STDOUT to file to export data.  
-  
-* **--add** &lt;wl_name&gt; &lt;wl_type&gt; &lt;wl_name&gt; &lt;wl_type&gt;  
-  NotImplemented. Create a static watchlist.
-  
-* **--delete** &lt;wl ID&gt;, **--remove** &lt;wl ID&gt;  
-  NotImplemented. Deletes a Watchlist
-  
-* **-a** &lt;wl_name&gt; &lt;file or values&gt;... [&lt;wl_name&gt; &lt;file or values&gt;... ...], **--addvalues** &lt;wl_name&gt; &lt;file or values&gt;... [&lt;wl_name&gt; &lt;file or values&gt;... ...]  
-  NotImplemented. Add values to a static watchlist. 
-  
-* **--rmvalues** &lt;wl_name&gt; &lt;file or values&gt;... [&lt;wl_name&gt; &lt;file or values&gt;... ...]  
-  NotImplemented. Remove watchlist values from the watchlist. 
-  
-* **--json**  
-  NotImplemented. Prints only a JSON object to STDOUT output.  
-  
 
 <a name="options-msiem-api"></a>
 
@@ -403,7 +360,9 @@ The latest version of msiem may be downloaded from GitHub
 [](https://github.com/mfesiem/msiem)
 
 # List of all requests
-Generated with msiempy 0.3.5 from ESM 11.3.0 
+(From ESM {
+  "buildStamp": "11.3.0 20191109004423"
+} )
 
 `$ msiem api --list`
 

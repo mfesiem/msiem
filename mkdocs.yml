@@ -1,8 +1,20 @@
-site_name: msiem CLI manpage
-site_description: msiem CLI manpage
+site_name: msiem CLI Documentation
+site_description: msiem CLI Documentation
 repo_url: https://github.com/mfesiem/msiem
 repo_name: GitHub
 markdown_extensions:
     - toc:
         permalink: True
         separator: "_"
+plugins:
+  - search
+  - awesome-pages:
+        collapse_single_pages: true
+nav:
+    - "Latest": "index.md"
+    - "Versions": 
+        - ...
+theme:
+    name: mkdocs
+    nav_style: dark
+    custom_dir: _mkdocs_theme # Custom theme to remove the next/previous links in the header

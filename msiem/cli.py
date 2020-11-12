@@ -48,10 +48,11 @@ def pprint_json(obj):
     print(json.dumps(obj, indent=2))
 
 def get_parser():
-    parser = argparse.ArgumentParser(description="""McAfee SIEM Command Line Interface {msiem_version}  
+    parser = argparse.ArgumentParser(description="""McAfee SIEM Command Line Interface {msiem_version}.
+Most of the core msiempy features accessible with CLI.    
 
-License: MIT 
-Credits: Andy Walden, Tristan Landes  
+License: MIT. 
+Credits: Andy Walden, Tristan Landes.
 
 Run `msiem <command> --help` for more information about a sub-command.""".format(
         msiem_version=__version__,),
@@ -105,7 +106,7 @@ Run `msiem <command> --help` for more information about a sub-command.""".format
     ### DS ###
     ds_parser = commands.add_parser('ds', formatter_class=Formatter, help="Add datasources from CSV or INI files, list, search, remove.  ", description=ds_cmd.__doc__)
     ds_parser.add_argument( '-a', '--add', metavar='<file or folder>', help=   'Scan a directory or a file for new Datasource files and add them to the ESM. '
-                                                                                'Datasources can be defined in CSV or INI format (see README.md).  ')        
+                                                                                'Datasources can be defined in CSV or INI format.  ')        
     ds_parser.add_argument( '-s', '--search' ,  nargs='?', default=None, metavar='term',
                              help='Search for datasource name, hostname, or IP.'
                                    'May require quotes around the name if there'

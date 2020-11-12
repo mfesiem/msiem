@@ -1,4 +1,5 @@
-set -e
+# Stop if errors
+set -euo pipefail
 
 rm -rf ./dist
 

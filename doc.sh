@@ -1,20 +1,24 @@
 #!/bin/bash
-# This shell script builds the manpage docs for msiem
-# See the markdown file under the ./docs folder 
+# This shell script builds the manpage docs for msiem. 
+# I've been running it from MacOS but I beleive it's valid on Linux too. 
+# See the markdown files under the ./docs folder 
 # and the mkdocs build under the ./site folder
 
-set -e
+# Stop if errors
+set -euo pipefail
 
 # Install requirements
-python3 -m pip install argparse-manpage mkdocs
+python3 -m pip install argparse-manpage mkdocs mkdocs-awesome-pages-plugin
 
-git clone https://github.com/mle86/man-to-md.git || true
-
-if ! which markdown; then
-    sudo npm install markdown-to-html -g
+# Cloning or pulling changes from the documentation
+if [[ ! -d man-to-md ]]; then
+    git clone https://github.com/mle86/man-to-md.git
+else
+    cd man-to-md && git pull --quiet && cd ..
 fi
 
-mkdir -p ./docs
+docsfolder="./docs/$(python3 setup.py -V)"
+mkdir -p "${docsfolder}"
 
 # Generating documentation
 MANWIDTH=120
@@ -25,9 +29,11 @@ argparse-manpage --pyfile ./msiem/cli.py \
     --project-name "msiem" \
     --url https://github.com/mfesiem/msiem > msiem.1
 
+# Customize the docs with some replacements with sed
 # Delete the weird ".SS"
 # List all sub commands and use the lower case name!
-# Also replace the link to hithub with no name
+# Replace msiem(1) by msiem <version>
+# Also replace the link to github with no name
 ./man-to-md/man-to-md.pl < msiem.1 | sed 's/.SS//' \
     | sed 's/Msiem Config/msiem config/' \
     | sed 's/Msiem Alarms/msiem alarms/' \
@@ -36,8 +42,26 @@ argparse-manpage --pyfile ./msiem/cli.py \
     | sed 's/Msiem Events/msiem events/' \
     | sed 's/Msiem Wl/msiem wl/' \
     | sed 's/Msiem Api/msiem api/' \
-    | sed 's/The latest version of msiem may be downloaded from/The latest version of msiem may be downloaded from GitHub/' > docs/index.md
+    | sed 's/The latest version of msiem may be downloaded from/The latest version of msiem may be downloaded from GitHub/' \
+    | sed "s/msiem(1)/msiem $(python3 setup.py -V)/" \
+        > "${docsfolder}/index.md"
 
+# Remove the raw manpage
 rm msiem.1
 
+# List all requests
+echo >> "${docsfolder}/index.md"
+echo "# List of all requests" >> "${docsfolder}/index.md"
+echo "Generated with msiempy $(python3 -c 'from msiempy import VERSION; print(VERSION)') from ESM $(python3 -c 'from msiempy import NitroSession; print(NitroSession().version())') " >> "${docsfolder}/index.md"
+echo >> "${docsfolder}/index.md"
+echo "\`$ msiem api --list\`" >> "${docsfolder}/index.md"
+echo >> "${docsfolder}/index.md"
+echo "\`\`\`" >> "${docsfolder}/index.md"
+python3 -m msiem api --list >> "${docsfolder}/index.md"
+echo "\`\`\`" >> "${docsfolder}/index.md"
+
+# Copy the docs in the versionned folder to the latest
+cp "${docsfolder}/index.md" "docs/index.md"
+
+# Build
 mkdocs build
