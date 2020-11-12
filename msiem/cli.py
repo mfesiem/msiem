@@ -54,6 +54,8 @@ Most of the core msiempy features accessible with CLI.
 License: MIT. 
 Credits: Andy Walden, Tristan Landes.
 
+Hosted on GitHub at: https://github.com/mfesiem/msiem
+
 Run `msiem <command> --help` for more information about a sub-command.""".format(
         msiem_version=__version__,),
         prog='msiem',
