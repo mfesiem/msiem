@@ -14,17 +14,19 @@
  McAfee SIEM Command Line Interface
 ```
 
-Most of the core `msiempy` features accessible with CLI.  
+Most of the core [`msiempy`](https://github.com/mfesiem/msiempy) features accessible with CLI.  
 
 Based on the work of [andywalen](https://github.com/andywalden).  
 
 ## Features
 
-- ESM operations: monitor, show statuses
-- Datasource operations: add, delete - including client datasources
-- Alarm operations and querying: filter, acknowledge, unacknowledge, delete
-- Event operations and querying: filter
-- Query any ESM API endpoint with any data.
+    msiem config              Set and print your msiempy config.
+    msiem alarms              Query alarms with alarms and events based regex filters. 
+                              Print, acknowledge, unacknowledge and delete alarms.
+    msiem esm                 Show ESM version and misc informations regarding your ESM.
+    msiem ds                  Add datasources from CSV or INI files, list, search, remove.
+    msiem events              Query events with any simple filter.
+    msiem api                 Quickly make API requests to any enpoints with any data.
 
 ## Installation
 ```bash
