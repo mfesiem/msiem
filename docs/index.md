@@ -22,6 +22,8 @@ Most of the core msiempy features accessible with CLI.
 License: MIT. 
 Credits: Andy Walden, Tristan Landes.
 
+Hosted on GitHub at: https://github.com/mfesiem/msiem
+
 Run \`msiem &lt;command&gt; --help\` for more information about a sub-command.
 
 <a name="options"></a>
@@ -234,7 +236,7 @@ Add Datasources with:
 
 
 * **-a** &lt;file or folder&gt;, **--add** &lt;file or folder&gt;  
-  Scan a directory or a file for new Datasource files and add them to the ESM. Datasources can be defined in CSV or INI format (see README.md).  
+  Scan a directory or a file for new Datasource files and add them to the ESM. Datasources can be defined in CSV or INI format.  
   
 * **-s** [term], **--search** [term]  
   Search for datasource name, hostname, or IP.May require quotes around the name if thereare spaces.
