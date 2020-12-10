@@ -120,7 +120,7 @@ Run `msiem <command> --help` for more information about a sub-command.""".format
 
 
     ### EVENTS 
-    events_parser = commands.add_parser('events', formatter_class=Formatter, help="Query events with any simple filter. Add a note to events.  ", description=events_cmd.__doc__)
+    events_parser = commands.add_parser('events', formatter_class=Formatter, help="Query events with any simple filter. ", description=events_cmd.__doc__)
     
     events_parser.add_argument('--time_range','-t', metavar='time_range', help='Timerange, choose from '+', '.join(FilteredQueryList.POSSIBLE_TIME_RANGE),  
         choices=FilteredQueryList.POSSIBLE_TIME_RANGE, default='CURRENT_DAY')
@@ -131,12 +131,12 @@ Run `msiem <command> --help` for more information about a sub-command.""".format
     events_parser.add_argument('--fields', metavar="<field>", nargs='+', help="List of fields that appear in the events table. Default value: {}. ".format(DEFAULT_EVENT_FIELDS_QUERY), default=None)
     events_parser.add_argument('--json', action='store_true', help="Prints only a JSON object to STDOUT output.  ")
     events_parser.add_argument('--limit', metavar='<int>', help='Size of requests', default=500, type=int)
+    events_parser.add_argument('--max', '--max_query_depth', dest='max', metavar='<int>', help='Maximum number of reccursive time based divisions the loading process can apply to the query in order to load all events', default=0, type=int)
     
-    events_parser.add_argument('--max', '--max_query_depth', metavar='<int>', help='Maximum number of reccursive time based divisions the loading process can apply to the query in order to load all events', default=0, type=int)
-    events_parser.add_argument('--grouped', action='store_true', help='Indicate a grouped events query, a IPSID filter must be provided and only one field value is accepted. ')
-    events_parser.add_argument('--add_note', metavar='<file or text>', help="Add a note to the events matching the filters. ")
-    events_parser.add_argument('--listfields', action='store_true', help="List all possible fields names")
-    events_parser.add_argument('--listfilters', action='store_true', help="List all possible fields names usable in filters")
+    events_parser.add_argument('--grouped', action='store_true', help='NotImplemented. Indicate a grouped events query, a IPSID filter must be provided and only one field value is accepted. ')
+    events_parser.add_argument('--add_note', metavar='<file or text>', help="NotImplemented. Add a note to the events matching the filters. ")
+    events_parser.add_argument('--listfields', action='store_true', help="NotImplemented. List all possible fields names")
+    events_parser.add_argument('--listfilters', action='store_true', help="NotImplemented. List all possible fields names usable in filters")
 
     ### WATCHLIST ###
     wl_parser = commands.add_parser('wl', formatter_class=Formatter, help="Manage watchlists. Export, import values.  ", description=wl_cmd.__doc__)
@@ -344,7 +344,7 @@ def events_cmd_parse_filters(filters_args):
 
 def events_cmd(args):
     """
-Query events with filters, add note to events.  
+Query events with filters. 
 
 With simple filters:
 
@@ -355,6 +355,15 @@ Print the results as JSON.
 
     $ msiem events --filter SrcIP IN 22.0.0.0/8 10.0.0.0/8 --filter DSIDSigID IN 49190-4294967295 --fields SrcIP DstIP Rule.msg DSIDSigID --json
     """
+    
+    if args.grouped:
+        raise NotImplementedError("events --grouped")                           
+    if args.add_note:
+        raise NotImplementedError("events --add_note")
+    if args.listfields:
+        raise NotImplementedError("events --listfields")
+    if args.listfilters:
+        raise NotImplementedError("events --listfilters")
 
     # Parse the list of lists passed as args
     filters = events_cmd_parse_filters(args.filters)
@@ -368,7 +377,7 @@ Print the results as JSON.
         limit=args.limit,
     )
 
-    events.load_data()
+    events.load_data(max_query_depth=args.max)
     if args.json:
         text = events.json
     else: 
@@ -419,16 +428,16 @@ Watchlist operations.
             my_wl=my_wl[0]
         
         my_wl.add_values()
-        raise NotImplementedError()
+        raise NotImplementedError("wl --addvalues")
 
     if args.add:
-        raise NotImplementedError()
+        raise NotImplementedError("wl --add")
     if args.delete:
-        raise NotImplementedError()
+        raise NotImplementedError("wl --delete")
     if args.rmvalues:
-        raise NotImplementedError()
+        raise NotImplementedError("wl --rmvalues")
     if args.json:
-        raise NotImplementedError()
+        raise NotImplementedError("wl --json")
 
 def api_cmd_get_api_docs():
     """
