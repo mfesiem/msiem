@@ -16,7 +16,7 @@
 
 Most of the [`msiempy`](https://github.com/mfesiem/msiempy) features accessible with CLI.  
 
-Based on the work of [andywalen](https://github.com/andywalden).  
+Based on the work of [Andy Walden](https://github.com/andywalden).  
 
 ## Features
 
